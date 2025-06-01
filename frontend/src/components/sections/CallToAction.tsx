@@ -21,3 +21,5 @@
 +          </Button>
 +        </Link>
        </motion.div>
+
+export default React
