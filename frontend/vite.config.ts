@@ -3,7 +3,7 @@ import react from '@vitejs/plugin-react';
 import path from 'path';
 
 export default defineConfig({
-  root: 'frontend', // tell Vite to start in the frontend folder
+  root: 'frontend',
   plugins: [react()],
   resolve: {
     alias: {
@@ -11,6 +11,6 @@ export default defineConfig({
     },
   },
   build: {
-    outDir: '../dist', // output build to project root /dist
+    outDir: '../dist',
   },
 });
