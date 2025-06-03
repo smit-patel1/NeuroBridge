@@ -14,31 +14,64 @@ export default function Demo() {
   const [rawResponse, setRawResponse] = useState('');
   const simulationRef = useRef<HTMLDivElement>(null);
 
-  // When simulationData changes, clear out old elements and inject new canvas + script
+  // Clean up function to remove old simulation scripts
+  const cleanupSimulation = () => {
+    // Remove any existing simulation scripts from document
+    document.querySelectorAll('script[data-simulation]').forEach(script => {
+      script.remove();
+    });
+    
+    // Clear simulation container
+    if (simulationRef.current) {
+      simulationRef.current.innerHTML = '';
+    }
+  };
+
+  // When simulationData changes, inject new canvas and script
   useEffect(() => {
     if (!simulationData || !simulationRef.current) return;
 
-    const container = simulationRef.current;
+    try {
+      const container = simulationRef.current;
+      
+      // Clean up old simulation
+      cleanupSimulation();
 
-    // 1) Remove any old <script data-simulation> in this container
-    container.querySelectorAll('script[data-simulation]').forEach((script) => script.remove());
-
-    // 2) Clear out the old canvas and any leftover HTML
-    container.innerHTML = '';
-
-    // 3) Insert the new <canvas> element from simulationData.canvasHtml
-    const wrapper = document.createElement('div');
-    wrapper.innerHTML = simulationData.canvasHtml.trim();
-    const newCanvas = wrapper.firstElementChild;
-    if (newCanvas instanceof HTMLElement) {
-      container.appendChild(newCanvas);
+      // Insert the canvas HTML
+      const wrapper = document.createElement('div');
+      wrapper.innerHTML = simulationData.canvasHtml.trim();
+      const canvasElement = wrapper.firstElementChild;
+      
+      if (canvasElement instanceof HTMLElement) {
+        container.appendChild(canvasElement);
+        
+        // Wait for canvas to be in DOM, then execute script
+        setTimeout(() => {
+          try {
+            // Create script element and append to document head (not container)
+            const script = document.createElement('script');
+            script.setAttribute('data-simulation', 'true');
+            script.textContent = simulationData.jsCode;
+            
+            // Add error handling to the script
+            script.onerror = (error) => {
+              console.error('Script execution error:', error);
+              setError('Animation script failed to execute');
+            };
+            
+            document.head.appendChild(script);
+          } catch (scriptError) {
+            console.error('Script creation error:', scriptError);
+            setError('Failed to create animation script');
+          }
+        }, 100);
+      } else {
+        setError('Invalid canvas HTML received');
+      }
+    } catch (domError) {
+      console.error('DOM manipulation error:', domError);
+      setError('Failed to create simulation canvas');
     }
-
-    // 4) Create and append a <script> inside this container so it executes after the canvas
-    const script = document.createElement('script');
-    script.setAttribute('data-simulation', 'true');
-    script.textContent = simulationData.jsCode;
-    container.appendChild(script);
   }, [simulationData]);
 
   const runSimulation = async () => {
@@ -46,13 +79,10 @@ export default function Demo() {
     setError('');
     setSuggestion('');
     setRawResponse('');
+    
+    // Clean up any existing simulation first
+    cleanupSimulation();
     setSimulationData(null);
-
-    // Immediately clear any existing simulation DOM
-    if (simulationRef.current) {
-      simulationRef.current.querySelectorAll('script[data-simulation]').forEach((script) => script.remove());
-      simulationRef.current.innerHTML = '';
-    }
 
     try {
       const response = await fetch("https://zurfhydnztcxlomdyqds.functions.supabase.co/simulate", {
@@ -70,7 +100,8 @@ export default function Demo() {
         data = await response.json();
         setRawResponse(JSON.stringify(data, null, 2));
       } else {
-        throw new Error(`Unexpected response format (status: ${response.status})`);
+        const textResponse = await response.text();
+        throw new Error(`Unexpected response format (status: ${response.status}): ${textResponse.substring(0, 200)}...`);
       }
 
       if (!response.ok) {
@@ -84,22 +115,35 @@ export default function Demo() {
         return;
       }
 
-      // Check for the correct response structure from backend
+      // Validate response structure
       if (data.canvasHtml && data.jsCode) {
+        console.log('✓ Valid simulation data received');
         setSimulationData({
           canvasHtml: data.canvasHtml,
           jsCode: data.jsCode,
         });
       } else {
-        setError('No simulation code returned. Backend response: ' + JSON.stringify(data));
+        const missingFields = [];
+        if (!data.canvasHtml) missingFields.push('canvasHtml');
+        if (!data.jsCode) missingFields.push('jsCode');
+        
+        setError(`Backend returned incomplete data. Missing: ${missingFields.join(', ')}`);
+        console.error('Invalid backend response:', data);
       }
     } catch (err: any) {
-      console.error('Simulation error:', err);
-      setError(err.message || 'Failed to connect to the simulation engine.');
+      console.error('Simulation request error:', err);
+      setError(err.message || 'Failed to connect to simulation engine');
     } finally {
       setLoading(false);
     }
   };
+
+  // Cleanup on component unmount
+  useEffect(() => {
+    return () => {
+      cleanupSimulation();
+    };
+  }, []);
 
   return (
     <div className="min-h-screen bg-gray-900 pt-16">
@@ -177,19 +221,25 @@ export default function Demo() {
                 {error && (
                   <div className="mb-4 bg-red-500/10 border border-red-500/20 rounded-lg p-4 text-red-200 flex items-start">
                     <AlertCircle className="w-5 h-5 mr-2 flex-shrink-0 mt-0.5" />
-                    <div>{error}</div>
+                    <div className="text-sm whitespace-pre-wrap">{error}</div>
                   </div>
                 )}
 
                 {/* Simulation Container */}
                 <div
                   ref={simulationRef}
-                  className="bg-white rounded-lg p-4 min-h-[300px] flex items-center justify-center"
+                  className="bg-white rounded-lg p-4 min-h-[400px] flex items-center justify-center"
                 >
                   {!simulationData && !loading && !error && (
                     <p className="text-gray-500">
                       Enter a prompt and click "Run Simulation" to get started
                     </p>
+                  )}
+                  {loading && (
+                    <div className="flex items-center text-gray-500">
+                      <Loader2 className="w-6 h-6 animate-spin mr-3" />
+                      Generating simulation...
+                    </div>
                   )}
                 </div>
               </div>
