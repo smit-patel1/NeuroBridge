@@ -9,35 +9,50 @@ export default function Demo() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [suggestion, setSuggestion] = useState('');
-  const [simulationData, setSimulationData] = useState<{canvasHtml: string, jsCode: string} | null>(null);
+  const [simulationData, setSimulationData] = useState<{ canvasHtml: string; jsCode: string } | null>(null);
   const [showConsole, setShowConsole] = useState(false);
   const [rawResponse, setRawResponse] = useState('');
   const simulationRef = useRef<HTMLDivElement>(null);
 
-  // Execute JavaScript when simulation data changes
+  // When simulationData changes, clear out old elements and inject new canvas + script
   useEffect(() => {
-    if (simulationData && simulationRef.current) {
-      // Clear any existing scripts
-      const existingScripts = document.querySelectorAll('script[data-simulation]');
-      existingScripts.forEach(script => script.remove());
+    if (!simulationData || !simulationRef.current) return;
 
-      // Insert canvas HTML
-      simulationRef.current.innerHTML = simulationData.canvasHtml;
+    const container = simulationRef.current;
 
-      // Execute JavaScript
-      const script = document.createElement('script');
-      script.setAttribute('data-simulation', 'true');
-      script.textContent = simulationData.jsCode;
-      document.body.appendChild(script);
+    // 1) Remove any old <script data-simulation> in this container
+    container.querySelectorAll('script[data-simulation]').forEach((script) => script.remove());
+
+    // 2) Clear out the old canvas and any leftover HTML
+    container.innerHTML = '';
+
+    // 3) Insert the new <canvas> element from simulationData.canvasHtml
+    const wrapper = document.createElement('div');
+    wrapper.innerHTML = simulationData.canvasHtml.trim();
+    const newCanvas = wrapper.firstElementChild;
+    if (newCanvas instanceof HTMLElement) {
+      container.appendChild(newCanvas);
     }
+
+    // 4) Create and append a <script> inside this container so it executes after the canvas
+    const script = document.createElement('script');
+    script.setAttribute('data-simulation', 'true');
+    script.textContent = simulationData.jsCode;
+    container.appendChild(script);
   }, [simulationData]);
 
   const runSimulation = async () => {
     setLoading(true);
     setError('');
     setSuggestion('');
-    setSimulationData(null);
     setRawResponse('');
+    setSimulationData(null);
+
+    // Immediately clear any existing simulation DOM
+    if (simulationRef.current) {
+      simulationRef.current.querySelectorAll('script[data-simulation]').forEach((script) => script.remove());
+      simulationRef.current.innerHTML = '';
+    }
 
     try {
       const response = await fetch("https://zurfhydnztcxlomdyqds.functions.supabase.co/simulate", {
@@ -69,16 +84,15 @@ export default function Demo() {
         return;
       }
 
-      // Check for the correct response structure from your backend
+      // Check for the correct response structure from backend
       if (data.canvasHtml && data.jsCode) {
         setSimulationData({
           canvasHtml: data.canvasHtml,
-          jsCode: data.jsCode
+          jsCode: data.jsCode,
         });
       } else {
         setError('No simulation code returned. Backend response: ' + JSON.stringify(data));
       }
-
     } catch (err: any) {
       console.error('Simulation error:', err);
       setError(err.message || 'Failed to connect to the simulation engine.');
@@ -106,7 +120,9 @@ export default function Demo() {
                 className="w-full bg-gray-700 text-white rounded-lg py-2 px-3 appearance-none cursor-pointer"
               >
                 {subjects.map((s) => (
-                  <option key={s} value={s}>{s}</option>
+                  <option key={s} value={s}>
+                    {s}
+                  </option>
                 ))}
               </select>
               <ChevronDown className="absolute right-3 top-2.5 w-5 h-5 text-gray-400 pointer-events-none" />
@@ -132,9 +148,7 @@ export default function Demo() {
             disabled={loading || !prompt.trim()}
             className="bg-yellow-500 text-black py-3 px-4 rounded-lg font-semibold hover:bg-yellow-400 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center"
           >
-            {loading ? (
-              <Loader2 className="w-5 h-5 animate-spin mr-2" />
-            ) : null}
+            {loading ? <Loader2 className="w-5 h-5 animate-spin mr-2" /> : null}
             Run Simulation
           </button>
         </div>
@@ -168,12 +182,14 @@ export default function Demo() {
                 )}
 
                 {/* Simulation Container */}
-                <div 
+                <div
                   ref={simulationRef}
                   className="bg-white rounded-lg p-4 min-h-[300px] flex items-center justify-center"
                 >
                   {!simulationData && !loading && !error && (
-                    <p className="text-gray-500">Enter a prompt and click "Run Simulation" to get started</p>
+                    <p className="text-gray-500">
+                      Enter a prompt and click "Run Simulation" to get started
+                    </p>
                   )}
                 </div>
               </div>
