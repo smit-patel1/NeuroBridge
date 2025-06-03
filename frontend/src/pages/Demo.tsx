@@ -21,7 +21,7 @@ export default function Demo() {
     setRawResponse('');
 
     try {
-      const response = await fetch('https://zurfhydnztcxlomdyqds.supabase.co/functions/v1/simulate', {
+      const response = await fetch("https://zurfhydnztcxlomdyqds.functions.supabase.co/simulate", {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
