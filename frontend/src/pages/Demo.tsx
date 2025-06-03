@@ -3,6 +3,40 @@ import { Loader2, AlertCircle, ChevronDown, Code } from 'lucide-react';
 
 const subjects = ['Mathematics', 'Physics', 'Computer Science'];
 
+// Error Boundary Component
+class SimulationErrorBoundary extends React.Component {
+  constructor(props: any) {
+    super(props);
+    this.state = { hasError: false, error: null };
+  }
+
+  static getDerivedStateFromError(error: any) {
+    return { hasError: true, error };
+  }
+
+  componentDidCatch(error: any, errorInfo: any) {
+    console.error('Simulation Error:', error, errorInfo);
+  }
+
+  render() {
+    if ((this.state as any).hasError) {
+      return (
+        <div className="bg-red-500/10 border border-red-500/20 rounded-lg p-4 text-red-200">
+          <AlertCircle className="w-5 h-5 mr-2 inline" />
+          Simulation crashed. Check console for details.
+          <button 
+            onClick={() => this.setState({ hasError: false, error: null })}
+            className="ml-2 px-2 py-1 bg-red-600 rounded text-sm"
+          >
+            Reset
+          </button>
+        </div>
+      );
+    }
+    return this.props.children;
+  }
+}
+
 export default function Demo() {
   const [prompt, setPrompt] = useState('');
   const [subject, setSubject] = useState(subjects[0]);
@@ -20,6 +54,55 @@ export default function Demo() {
     if (simulationRef.current) simulationRef.current.innerHTML = '';
   };
 
+  // Safe script execution with comprehensive error handling
+  const executeSimulationScript = (jsCode: string) => {
+    return new Promise<void>((resolve, reject) => {
+      try {
+        // Wrap the user's code in a try-catch
+        const wrappedCode = `
+          try {
+            ${jsCode}
+          } catch (error) {
+            console.error('Simulation script error:', error);
+            throw error;
+          }
+        `;
+
+        const script = document.createElement('script');
+        script.setAttribute('data-simulation', 'true');
+        script.textContent = wrappedCode;
+        
+        script.onload = () => resolve();
+        script.onerror = (error) => {
+          console.error('Script loading error:', error);
+          reject(new Error('Failed to load simulation script'));
+        };
+
+        // Add global error handler for the script execution
+        const originalErrorHandler = window.onerror;
+        window.onerror = (message, source, lineno, colno, error) => {
+          if (source?.includes('data-simulation')) {
+            console.error('Simulation runtime error:', message, error);
+            reject(new Error(`Simulation error: ${message}`));
+            return true;
+          }
+          return originalErrorHandler?.call(window, message, source, lineno, colno, error) || false;
+        };
+
+        document.head.appendChild(script);
+
+        // Restore original error handler after a delay
+        setTimeout(() => {
+          window.onerror = originalErrorHandler;
+        }, 1000);
+
+      } catch (error) {
+        console.error('Script creation error:', error);
+        reject(error);
+      }
+    });
+  };
+
   // Execute JavaScript when simulation data changes
   useEffect(() => {
     if (simulationData && simulationRef.current) {
@@ -28,26 +111,25 @@ export default function Demo() {
       // Insert canvas HTML
       simulationRef.current.innerHTML = simulationData.canvasHtml;
 
-      // Wait for DOM update, then inject script
-      setTimeout(() => {
+      // Wait longer for DOM to be fully ready
+      setTimeout(async () => {
         try {
-          const script = document.createElement('script');
-          script.setAttribute('data-simulation', 'true');
-          script.textContent = simulationData.jsCode;
-          script.onerror = (e) => {
-            setError('Simulation script failed to execute.');
-            console.error('Simulation script error:', e);
-          };
-          document.head.appendChild(script);
-        } catch (e) {
-          setError('Failed to inject simulation script.');
-          console.error(e);
+          // Check if canvas exists before executing script
+          const canvas = simulationRef.current?.querySelector('canvas');
+          if (!canvas) {
+            throw new Error('Canvas element not found after DOM insertion');
+          }
+
+          await executeSimulationScript(simulationData.jsCode);
+          console.log('✓ Simulation script executed successfully');
+        } catch (scriptError) {
+          console.error('Script execution failed:', scriptError);
+          setError(`Simulation failed to start: ${(scriptError as Error).message}`);
         }
-      }, 50);
+      }, 200); // Increased timeout
     }
-    // Cleanup on unmount or before next simulation
+    
     return cleanupSimulation;
-    // eslint-disable-next-line
   }, [simulationData]);
 
   const runSimulation = async () => {
@@ -90,6 +172,7 @@ export default function Demo() {
       }
 
       if (data.canvasHtml && data.jsCode) {
+        console.log('✓ Valid simulation data received');
         setSimulationData({
           canvasHtml: data.canvasHtml,
           jsCode: data.jsCode
@@ -185,19 +268,27 @@ export default function Demo() {
                 {error && (
                   <div className="mb-4 bg-red-500/10 border border-red-500/20 rounded-lg p-4 text-red-200 flex items-start">
                     <AlertCircle className="w-5 h-5 mr-2 flex-shrink-0 mt-0.5" />
-                    <div>{error}</div>
+                    <div className="text-sm">{error}</div>
                   </div>
                 )}
 
-                {/* Simulation Container */}
-                <div 
-                  ref={simulationRef}
-                  className="bg-white rounded-lg p-4 min-h-[300px] flex items-center justify-center"
-                >
-                  {!simulationData && !loading && !error && (
-                    <p className="text-gray-500">Enter a prompt and click "Run Simulation" to get started</p>
-                  )}
-                </div>
+                {/* Simulation Container with Error Boundary */}
+                <SimulationErrorBoundary>
+                  <div 
+                    ref={simulationRef}
+                    className="bg-white rounded-lg p-4 min-h-[300px] flex items-center justify-center"
+                  >
+                    {!simulationData && !loading && !error && (
+                      <p className="text-gray-500">Enter a prompt and click "Run Simulation" to get started</p>
+                    )}
+                    {loading && (
+                      <div className="flex items-center text-gray-500">
+                        <Loader2 className="w-6 h-6 animate-spin mr-3" />
+                        Generating simulation...
+                      </div>
+                    )}
+                  </div>
+                </SimulationErrorBoundary>
               </div>
             </div>
           </div>
