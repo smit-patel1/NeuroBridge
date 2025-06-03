@@ -1,1 +1,1 @@
-# NeuroBridge
+# MindRender
