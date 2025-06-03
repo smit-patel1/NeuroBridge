@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { Loader2, AlertCircle, ChevronDown, Code } from 'lucide-react';
 
 const subjects = ['Mathematics', 'Physics', 'Computer Science'];
@@ -9,15 +9,34 @@ export default function Demo() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [suggestion, setSuggestion] = useState('');
-  const [simulationCode, setSimulationCode] = useState('');
+  const [simulationData, setSimulationData] = useState<{canvasHtml: string, jsCode: string} | null>(null);
   const [showConsole, setShowConsole] = useState(false);
   const [rawResponse, setRawResponse] = useState('');
+  const simulationRef = useRef<HTMLDivElement>(null);
+
+  // Execute JavaScript when simulation data changes
+  useEffect(() => {
+    if (simulationData && simulationRef.current) {
+      // Clear any existing scripts
+      const existingScripts = document.querySelectorAll('script[data-simulation]');
+      existingScripts.forEach(script => script.remove());
+
+      // Insert canvas HTML
+      simulationRef.current.innerHTML = simulationData.canvasHtml;
+
+      // Execute JavaScript
+      const script = document.createElement('script');
+      script.setAttribute('data-simulation', 'true');
+      script.textContent = simulationData.jsCode;
+      document.body.appendChild(script);
+    }
+  }, [simulationData]);
 
   const runSimulation = async () => {
     setLoading(true);
     setError('');
     setSuggestion('');
-    setSimulationCode('');
+    setSimulationData(null);
     setRawResponse('');
 
     try {
@@ -50,10 +69,14 @@ export default function Demo() {
         return;
       }
 
-      if (data.code) {
-        setSimulationCode(data.code);
+      // Check for the correct response structure from your backend
+      if (data.canvasHtml && data.jsCode) {
+        setSimulationData({
+          canvasHtml: data.canvasHtml,
+          jsCode: data.jsCode
+        });
       } else {
-        setError('No simulation code returned.');
+        setError('No simulation code returned. Backend response: ' + JSON.stringify(data));
       }
 
     } catch (err: any) {
@@ -144,12 +167,15 @@ export default function Demo() {
                   </div>
                 )}
 
-                {simulationCode && (
-                  <div 
-                    className="bg-white rounded-lg p-4 min-h-[300px]"
-                    dangerouslySetInnerHTML={{ __html: simulationCode }}
-                  />
-                )}
+                {/* Simulation Container */}
+                <div 
+                  ref={simulationRef}
+                  className="bg-white rounded-lg p-4 min-h-[300px] flex items-center justify-center"
+                >
+                  {!simulationData && !loading && !error && (
+                    <p className="text-gray-500">Enter a prompt and click "Run Simulation" to get started</p>
+                  )}
+                </div>
               </div>
             </div>
           </div>
