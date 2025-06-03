@@ -17,7 +17,9 @@ export default function Demo() {
     setLoading(true);
     setError('');
     setSuggestion('');
-    
+    setSimulationCode('');
+    setRawResponse('');
+
     try {
       const response = await fetch('https://zurfhydnztcxlomdyqds.supabase.co/functions/v1/simulate', {
         method: 'POST',
@@ -26,19 +28,37 @@ export default function Demo() {
         },
         body: JSON.stringify({ prompt, subject }),
       });
-      
-      const data = await response.json();
-      setRawResponse(JSON.stringify(data, null, 2));
-      
-      if (data.suggestion) {
-        setSuggestion(data.suggestion);
-      } else if (data.error) {
-        setError('Simulation failed. Try again.');
-      } else if (data.code) {
-        setSimulationCode(data.code);
+
+      const contentType = response.headers.get('content-type');
+      let data: any = {};
+
+      if (contentType && contentType.includes('application/json')) {
+        data = await response.json();
+        setRawResponse(JSON.stringify(data, null, 2));
+      } else {
+        throw new Error(`Unexpected response format (status: ${response.status})`);
       }
-    } catch (err) {
-      setError('Failed to connect to the simulation engine.');
+
+      if (!response.ok) {
+        if (data?.suggestion) {
+          setSuggestion(data.suggestion);
+        } else if (data?.error) {
+          setError(data.error || 'Simulation failed.');
+        } else {
+          setError(`Simulation failed with status ${response.status}`);
+        }
+        return;
+      }
+
+      if (data.code) {
+        setSimulationCode(data.code);
+      } else {
+        setError('No simulation code returned.');
+      }
+
+    } catch (err: any) {
+      console.error('Simulation error:', err);
+      setError(err.message || 'Failed to connect to the simulation engine.');
     } finally {
       setLoading(false);
     }
@@ -50,7 +70,7 @@ export default function Demo() {
         {/* Left Sidebar */}
         <div className="w-80 bg-gray-800 p-6 flex flex-col">
           <h2 className="text-xl font-bold text-white mb-6">Simulation Prompt</h2>
-          
+
           {/* Subject Selection */}
           <div className="mb-4">
             <label className="block text-sm font-medium text-gray-300 mb-2">
@@ -69,7 +89,7 @@ export default function Demo() {
               <ChevronDown className="absolute right-3 top-2.5 w-5 h-5 text-gray-400 pointer-events-none" />
             </div>
           </div>
-          
+
           {/* Prompt Input */}
           <div className="flex-grow mb-4">
             <label className="block text-sm font-medium text-gray-300 mb-2">
@@ -82,7 +102,7 @@ export default function Demo() {
               className="w-full h-48 bg-gray-700 text-white rounded-lg p-3 resize-none"
             />
           </div>
-          
+
           {/* Run Button */}
           <button
             onClick={runSimulation}
@@ -104,7 +124,7 @@ export default function Demo() {
               <div className="border-b border-gray-700 p-4">
                 <h2 className="text-xl font-bold text-white">Simulation</h2>
               </div>
-              
+
               {/* Messages and Simulation Output */}
               <div className="flex-1 p-4 overflow-auto">
                 {suggestion && (
@@ -116,14 +136,14 @@ export default function Demo() {
                     </div>
                   </div>
                 )}
-                
+
                 {error && (
                   <div className="mb-4 bg-red-500/10 border border-red-500/20 rounded-lg p-4 text-red-200 flex items-start">
                     <AlertCircle className="w-5 h-5 mr-2 flex-shrink-0 mt-0.5" />
                     <div>{error}</div>
                   </div>
                 )}
-                
+
                 {simulationCode && (
                   <div 
                     className="bg-white rounded-lg p-4 min-h-[300px]"
@@ -133,7 +153,7 @@ export default function Demo() {
               </div>
             </div>
           </div>
-          
+
           {/* Console Panel */}
           <div className="border-t border-gray-700">
             <button
@@ -143,7 +163,7 @@ export default function Demo() {
               <Code className="w-4 h-4 mr-2" />
               {showConsole ? 'Hide' : 'Show'} Response Console
             </button>
-            
+
             {showConsole && rawResponse && (
               <div className="p-4 bg-gray-800 max-h-48 overflow-auto">
                 <pre className="text-gray-300 text-sm">{rawResponse}</pre>
