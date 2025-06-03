@@ -9,80 +9,54 @@ export default function Demo() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [suggestion, setSuggestion] = useState('');
-  const [simulationData, setSimulationData] = useState<{ canvasHtml: string; jsCode: string } | null>(null);
+  const [simulationData, setSimulationData] = useState<{canvasHtml: string, jsCode: string} | null>(null);
   const [showConsole, setShowConsole] = useState(false);
   const [rawResponse, setRawResponse] = useState('');
   const simulationRef = useRef<HTMLDivElement>(null);
 
-  // Clean up function to remove old simulation scripts
+  // Cleanup function for old scripts and canvases
   const cleanupSimulation = () => {
-    // Remove any existing simulation scripts from document
-    document.querySelectorAll('script[data-simulation]').forEach(script => {
-      script.remove();
-    });
-    
-    // Clear simulation container
-    if (simulationRef.current) {
-      simulationRef.current.innerHTML = '';
-    }
+    document.querySelectorAll('script[data-simulation]').forEach(script => script.remove());
+    if (simulationRef.current) simulationRef.current.innerHTML = '';
   };
 
-  // When simulationData changes, inject new canvas and script
+  // Execute JavaScript when simulation data changes
   useEffect(() => {
-    if (!simulationData || !simulationRef.current) return;
-
-    try {
-      const container = simulationRef.current;
-      
-      // Clean up old simulation
+    if (simulationData && simulationRef.current) {
       cleanupSimulation();
 
-      // Insert the canvas HTML
-      const wrapper = document.createElement('div');
-      wrapper.innerHTML = simulationData.canvasHtml.trim();
-      const canvasElement = wrapper.firstElementChild;
-      
-      if (canvasElement instanceof HTMLElement) {
-        container.appendChild(canvasElement);
-        
-        // Wait for canvas to be in DOM, then execute script
-        setTimeout(() => {
-          try {
-            // Create script element and append to document head (not container)
-            const script = document.createElement('script');
-            script.setAttribute('data-simulation', 'true');
-            script.textContent = simulationData.jsCode;
-            
-            // Add error handling to the script
-            script.onerror = (error) => {
-              console.error('Script execution error:', error);
-              setError('Animation script failed to execute');
-            };
-            
-            document.head.appendChild(script);
-          } catch (scriptError) {
-            console.error('Script creation error:', scriptError);
-            setError('Failed to create animation script');
-          }
-        }, 100);
-      } else {
-        setError('Invalid canvas HTML received');
-      }
-    } catch (domError) {
-      console.error('DOM manipulation error:', domError);
-      setError('Failed to create simulation canvas');
+      // Insert canvas HTML
+      simulationRef.current.innerHTML = simulationData.canvasHtml;
+
+      // Wait for DOM update, then inject script
+      setTimeout(() => {
+        try {
+          const script = document.createElement('script');
+          script.setAttribute('data-simulation', 'true');
+          script.textContent = simulationData.jsCode;
+          script.onerror = (e) => {
+            setError('Simulation script failed to execute.');
+            console.error('Simulation script error:', e);
+          };
+          document.head.appendChild(script);
+        } catch (e) {
+          setError('Failed to inject simulation script.');
+          console.error(e);
+        }
+      }, 50);
     }
+    // Cleanup on unmount or before next simulation
+    return cleanupSimulation;
+    // eslint-disable-next-line
   }, [simulationData]);
 
   const runSimulation = async () => {
     setLoading(true);
     setError('');
     setSuggestion('');
-    setRawResponse('');
-    
-    // Clean up any existing simulation first
-    cleanupSimulation();
     setSimulationData(null);
+    setRawResponse('');
+    cleanupSimulation();
 
     try {
       const response = await fetch("https://zurfhydnztcxlomdyqds.functions.supabase.co/simulate", {
@@ -115,35 +89,25 @@ export default function Demo() {
         return;
       }
 
-      // Validate response structure
       if (data.canvasHtml && data.jsCode) {
-        console.log('✓ Valid simulation data received');
         setSimulationData({
           canvasHtml: data.canvasHtml,
-          jsCode: data.jsCode,
+          jsCode: data.jsCode
         });
       } else {
-        const missingFields = [];
-        if (!data.canvasHtml) missingFields.push('canvasHtml');
-        if (!data.jsCode) missingFields.push('jsCode');
-        
-        setError(`Backend returned incomplete data. Missing: ${missingFields.join(', ')}`);
-        console.error('Invalid backend response:', data);
+        setError('No simulation code returned. Backend response: ' + JSON.stringify(data));
       }
+
     } catch (err: any) {
-      console.error('Simulation request error:', err);
-      setError(err.message || 'Failed to connect to simulation engine');
+      console.error('Simulation error:', err);
+      setError(err.message || 'Failed to connect to the simulation engine.');
     } finally {
       setLoading(false);
     }
   };
 
   // Cleanup on component unmount
-  useEffect(() => {
-    return () => {
-      cleanupSimulation();
-    };
-  }, []);
+  useEffect(() => cleanupSimulation, []);
 
   return (
     <div className="min-h-screen bg-gray-900 pt-16">
@@ -164,9 +128,7 @@ export default function Demo() {
                 className="w-full bg-gray-700 text-white rounded-lg py-2 px-3 appearance-none cursor-pointer"
               >
                 {subjects.map((s) => (
-                  <option key={s} value={s}>
-                    {s}
-                  </option>
+                  <option key={s} value={s}>{s}</option>
                 ))}
               </select>
               <ChevronDown className="absolute right-3 top-2.5 w-5 h-5 text-gray-400 pointer-events-none" />
@@ -192,7 +154,9 @@ export default function Demo() {
             disabled={loading || !prompt.trim()}
             className="bg-yellow-500 text-black py-3 px-4 rounded-lg font-semibold hover:bg-yellow-400 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center"
           >
-            {loading ? <Loader2 className="w-5 h-5 animate-spin mr-2" /> : null}
+            {loading ? (
+              <Loader2 className="w-5 h-5 animate-spin mr-2" />
+            ) : null}
             Run Simulation
           </button>
         </div>
@@ -221,25 +185,17 @@ export default function Demo() {
                 {error && (
                   <div className="mb-4 bg-red-500/10 border border-red-500/20 rounded-lg p-4 text-red-200 flex items-start">
                     <AlertCircle className="w-5 h-5 mr-2 flex-shrink-0 mt-0.5" />
-                    <div className="text-sm whitespace-pre-wrap">{error}</div>
+                    <div>{error}</div>
                   </div>
                 )}
 
                 {/* Simulation Container */}
-                <div
+                <div 
                   ref={simulationRef}
-                  className="bg-white rounded-lg p-4 min-h-[400px] flex items-center justify-center"
+                  className="bg-white rounded-lg p-4 min-h-[300px] flex items-center justify-center"
                 >
                   {!simulationData && !loading && !error && (
-                    <p className="text-gray-500">
-                      Enter a prompt and click "Run Simulation" to get started
-                    </p>
-                  )}
-                  {loading && (
-                    <div className="flex items-center text-gray-500">
-                      <Loader2 className="w-6 h-6 animate-spin mr-3" />
-                      Generating simulation...
-                    </div>
+                    <p className="text-gray-500">Enter a prompt and click "Run Simulation" to get started</p>
                   )}
                 </div>
               </div>
