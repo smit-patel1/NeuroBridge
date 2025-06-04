@@ -17,7 +17,6 @@ export default function Demo() {
   const [error, setError] = useState('');
   const [suggestion, setSuggestion] = useState('');
   const [simulationData, setSimulationData] = useState<{canvasHtml: string, jsCode: string} | null>(null);
-  const [showConsole, setShowConsole] = useState(false);
   const [rawResponse, setRawResponse] = useState('');
   const [followUpPrompt, setFollowUpPrompt] = useState('');
   const [showTechnicalDetails, setShowTechnicalDetails] = useState(false);
@@ -163,7 +162,6 @@ export default function Demo() {
 
   const handleFollowUp = async () => {
     if (!followUpPrompt.trim()) return;
-    // Implementation for follow-up request would go here
     console.log('Follow-up:', followUpPrompt);
     setFollowUpPrompt('');
   };
@@ -179,20 +177,15 @@ export default function Demo() {
   return (
     <div className="min-h-screen bg-gray-900 pt-16">
       <div className="flex h-[calc(100vh-4rem)]">
-        {/* Left Sidebar - Now wider */}
-        <div className="w-[800px] bg-gray-800 p-6 flex flex-col">
-          <h2 className="text-xl font-bold text-white mb-6 flex items-center">
-            <MessageSquare className="w-5 h-5 mr-2" />
-            Simulation Prompt
-          </h2>
-
+        {/* Left Sidebar - Fixed 300px width */}
+        <div className="w-[300px] bg-gray-800 p-6 flex flex-col">
           <div className="mb-4">
             <label className="block text-sm font-medium text-gray-300 mb-2">Subject</label>
             <div className="relative">
               <select
                 value={subject}
                 onChange={(e) => setSubject(e.target.value)}
-                className="w-full bg-gray-700 text-white rounded-lg py-2 px-3 appearance-none cursor-pointer hover:bg-gray-600 transition-colors"
+                className="w-full bg-gray-700 text-white rounded-lg py-2 px-3 appearance-none cursor-pointer hover:bg-gray-600 transition-colors focus:ring-2 focus:ring-blue-500"
               >
                 {subjects.map((s) => (
                   <option key={s} value={s}>{s}</option>
@@ -215,14 +208,14 @@ export default function Demo() {
           <button
             onClick={runSimulation}
             disabled={loading || !prompt.trim()}
-            className="bg-yellow-500 text-black py-3 px-4 rounded-lg font-semibold hover:bg-yellow-400 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center mb-4 transition-colors"
+            className="bg-yellow-500 text-black py-3 px-4 rounded-lg font-semibold hover:bg-yellow-400 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center mb-6 transition-colors"
           >
             {loading ? <Loader2 className="w-5 h-5 animate-spin mr-2" /> : null}
             Run Simulation
           </button>
 
-          {/* Follow Up Section */}
-          <div className="border-t border-gray-700 pt-4 mt-2">
+          {/* Follow Up Section - Integrated with prompt area */}
+          <div className="border-t border-gray-700 pt-4">
             <h3 className="text-lg font-semibold text-white mb-4 flex items-center">
               <RefreshCw className="w-5 h-5 mr-2" />
               Follow Up
@@ -233,7 +226,7 @@ export default function Demo() {
                 <button
                   key={question}
                   onClick={() => setFollowUpPrompt(question)}
-                  className="bg-gray-700 text-white px-4 py-2 rounded-lg hover:bg-gray-600 transition-colors text-sm"
+                  className="bg-gray-700 text-white px-3 py-1.5 rounded-lg hover:bg-gray-600 transition-colors text-sm focus:ring-2 focus:ring-blue-500"
                 >
                   {question}
                 </button>
@@ -246,12 +239,12 @@ export default function Demo() {
                 value={followUpPrompt}
                 onChange={(e) => setFollowUpPrompt(e.target.value)}
                 placeholder="Ask a follow-up question..."
-                className="flex-1 bg-gray-700 text-white rounded-lg px-4 py-2 focus:ring-2 focus:ring-blue-500 focus:outline-none"
+                className="flex-1 bg-gray-700 text-white rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:outline-none"
               />
               <button
                 onClick={handleFollowUp}
                 disabled={!followUpPrompt.trim()}
-                className="bg-blue-500 text-white px-4 py-2 rounded-lg hover:bg-blue-400 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                className="bg-blue-500 text-white px-4 py-2 rounded-lg hover:bg-blue-400 disabled:opacity-50 disabled:cursor-not-allowed transition-colors focus:ring-2 focus:ring-blue-300"
               >
                 Send
               </button>
@@ -260,120 +253,103 @@ export default function Demo() {
         </div>
 
         {/* Main Content */}
-        <div className="flex-1 flex flex-col">
-          <div className="flex-1 p-6 overflow-auto">
-            <div className="grid grid-cols-[1fr,300px] gap-6 h-full">
-              {/* Simulation Panel */}
-              <div className="bg-gray-800 rounded-lg flex flex-col">
-                <div className="border-b border-gray-700 p-4">
-                  <h2 className="text-xl font-bold text-white">Simulation</h2>
-                </div>
-
-                <div className="flex-1 p-4 overflow-auto">
-                  {suggestion && (
-                    <div className="mb-4 bg-yellow-500/10 border border-yellow-500/20 rounded-lg p-4 text-yellow-200 flex items-start">
-                      <AlertCircle className="w-5 h-5 mr-2 flex-shrink-0 mt-0.5" />
-                      <div>
-                        <p className="font-semibold">Prompt unclear</p>
-                        <p>Try this: {suggestion}</p>
-                      </div>
-                    </div>
-                  )}
-
-                  {error && (
-                    <div className="mb-4 bg-red-500/10 border border-red-500/20 rounded-lg p-4 text-red-200 flex items-start">
-                      <AlertCircle className="w-5 h-5 mr-2 flex-shrink-0 mt-0.5" />
-                      <div className="text-sm">{error}</div>
-                    </div>
-                  )}
-
-                  <div className="bg-white rounded-lg overflow-hidden min-h-[400px]">
-                    {!simulationData && !loading && !error && (
-                      <div className="flex items-center justify-center h-[400px] text-gray-500">
-                        Enter a prompt and click "Run Simulation\" to get started
-                      </div>
-                    )}
-                    
-                    {loading && (
-                      <div className="flex items-center justify-center h-[400px] text-gray-500">
-                        <Loader2 className="w-6 h-6 animate-spin mr-3" />
-                        Generating simulation...
-                      </div>
-                    )}
-                    
-                    {simulationData && (
-                      <iframe
-                        ref={iframeRef}
-                        className="w-full h-[400px] border-0"
-                        title="Simulation"
-                        sandbox="allow-scripts allow-same-origin"
-                      />
-                    )}
-                  </div>
-                </div>
+        <div className="flex-1 p-6">
+          <div className="grid grid-cols-[1fr,300px] gap-6 h-full">
+            {/* Simulation Panel */}
+            <div className="bg-gray-800 rounded-lg flex flex-col">
+              <div className="border-b border-gray-700 p-4">
+                <h2 className="text-xl font-bold text-white">Simulation</h2>
               </div>
 
-              {/* Explanation Panel */}
-              <div className="bg-gray-800 rounded-lg flex flex-col">
-                <div className="border-b border-gray-700 p-4 flex items-center justify-between">
-                  <h2 className="text-xl font-bold text-white flex items-center">
-                    <Lightbulb className="w-5 h-5 mr-2" />
-                    Explanation
-                  </h2>
-                  <button
-                    onClick={() => setShowTechnicalDetails(!showTechnicalDetails)}
-                    className="text-sm text-gray-400 hover:text-white transition-colors"
-                  >
-                    {showTechnicalDetails ? 'Show Simple' : 'Show Technical'}
-                  </button>
-                </div>
-
-                <div className="flex-1 p-4 overflow-auto">
-                  {!simulationData ? (
-                    <div className="text-gray-400 text-center">
-                      Run a simulation to see the explanation
+              <div className="flex-1 p-4">
+                {suggestion && (
+                  <div className="mb-4 bg-yellow-500/10 border border-yellow-500/20 rounded-lg p-4 text-yellow-200 flex items-start">
+                    <AlertCircle className="w-5 h-5 mr-2 flex-shrink-0 mt-0.5" />
+                    <div>
+                      <p className="font-semibold">Prompt unclear</p>
+                      <p>Try this: {suggestion}</p>
                     </div>
-                  ) : (
-                    <div className="space-y-4">
-                      <div className="bg-gray-700/50 rounded-lg p-4">
-                        <h3 className="text-lg font-semibold text-white mb-3">Key Points</h3>
-                        <ul className="list-disc list-inside space-y-2 text-gray-300">
-                          <li>Point 1 about the simulation</li>
-                          <li>Point 2 about the simulation</li>
-                          <li>Point 3 about the simulation</li>
-                        </ul>
-                      </div>
+                  </div>
+                )}
 
-                      {showTechnicalDetails && (
-                        <div className="bg-gray-700/50 rounded-lg p-4">
-                          <h3 className="text-lg font-semibold text-white mb-3">Technical Details</h3>
-                          <pre className="text-sm text-gray-300 whitespace-pre-wrap">
-                            {/* Technical details would go here */}
-                          </pre>
-                        </div>
-                      )}
+                {error && (
+                  <div className="mb-4 bg-red-500/10 border border-red-500/20 rounded-lg p-4 text-red-200 flex items-start">
+                    <AlertCircle className="w-5 h-5 mr-2 flex-shrink-0 mt-0.5" />
+                    <div className="text-sm">{error}</div>
+                  </div>
+                )}
+
+                <div className="bg-gray-900 rounded-lg overflow-hidden min-h-[400px] flex items-center justify-center">
+                  {!simulationData && !loading && !error && (
+                    <div className="text-gray-400 text-center p-8">
+                      <MessageSquare className="w-12 h-12 mx-auto mb-4 opacity-50" />
+                      <p>Enter a prompt and click "Run Simulation" to get started</p>
                     </div>
+                  )}
+                  
+                  {loading && (
+                    <div className="flex items-center justify-center text-gray-400">
+                      <Loader2 className="w-6 h-6 animate-spin mr-3" />
+                      Generating simulation...
+                    </div>
+                  )}
+                  
+                  {simulationData && (
+                    <iframe
+                      ref={iframeRef}
+                      className="w-full h-full border-0"
+                      title="Simulation"
+                      sandbox="allow-scripts allow-same-origin"
+                    />
                   )}
                 </div>
               </div>
             </div>
-          </div>
 
-          {/* Console Panel */}
-          <div className="border-t border-gray-700">
-            <button
-              onClick={() => setShowConsole(!showConsole)}
-              className="flex items-center px-4 py-2 text-gray-400 hover:text-white transition-colors"
-            >
-              <Code className="w-4 h-4 mr-2" />
-              {showConsole ? 'Hide' : 'Show'} Response Console
-            </button>
-
-            {showConsole && rawResponse && (
-              <div className="p-4 bg-gray-800 max-h-48 overflow-auto">
-                <pre className="text-gray-300 text-sm">{rawResponse}</pre>
+            {/* Explanation Panel */}
+            <div className="bg-gray-800 rounded-lg flex flex-col">
+              <div className="border-b border-gray-700 p-4 flex items-center justify-between">
+                <h2 className="text-xl font-bold text-white flex items-center">
+                  <Lightbulb className="w-5 h-5 mr-2" />
+                  Explanation
+                </h2>
+                <button
+                  onClick={() => setShowTechnicalDetails(!showTechnicalDetails)}
+                  className="px-3 py-1.5 rounded-lg bg-gray-700 text-gray-300 hover:bg-gray-600 hover:text-white transition-colors focus:ring-2 focus:ring-blue-500"
+                >
+                  {showTechnicalDetails ? 'Show Simple' : 'Show Technical'}
+                </button>
               </div>
-            )}
+
+              <div className="flex-1 p-4">
+                {!simulationData ? (
+                  <div className="flex flex-col items-center justify-center h-full text-gray-400 p-8 text-center">
+                    <Code className="w-12 h-12 mb-4 opacity-50" />
+                    <p>Run a simulation to see the explanation</p>
+                  </div>
+                ) : (
+                  <div className="space-y-4">
+                    <div className="bg-gray-700/50 rounded-lg p-4">
+                      <h3 className="text-lg font-semibold text-white mb-3">Key Points</h3>
+                      <ul className="list-disc list-inside space-y-2 text-gray-300">
+                        <li>Point 1 about the simulation</li>
+                        <li>Point 2 about the simulation</li>
+                        <li>Point 3 about the simulation</li>
+                      </ul>
+                    </div>
+
+                    {showTechnicalDetails && (
+                      <div className="bg-gray-700/50 rounded-lg p-4">
+                        <h3 className="text-lg font-semibold text-white mb-3">Technical Details</h3>
+                        <pre className="text-sm text-gray-300 whitespace-pre-wrap">
+                          {/* Technical details would go here */}
+                        </pre>
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
+            </div>
           </div>
         </div>
       </div>
