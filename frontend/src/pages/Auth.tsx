@@ -26,23 +26,23 @@ export default function Auth() {
       username: '',
       password: ''
     };
-    
+
     if (!formData.email) {
       newErrors.email = 'Email is required';
     } else if (!/\S+@\S+\.\S+/.test(formData.email)) {
       newErrors.email = 'Invalid email format';
     }
-    
+
     if (!isLogin && !formData.username) {
       newErrors.username = 'Username is required';
     }
-    
+
     if (!formData.password) {
       newErrors.password = 'Password is required';
     } else if (formData.password.length < 6) {
       newErrors.password = 'Password must be at least 6 characters';
     }
-    
+
     setErrors(newErrors);
     return !Object.values(newErrors).some(error => error !== '');
   };
@@ -50,25 +50,26 @@ export default function Auth() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!validateForm()) return;
-    
+
     setLoading(true);
     setError('');
+    const trimmedEmail = formData.email.trim().toLowerCase();
 
     try {
       if (isLogin) {
         const { data, error: signInError } = await supabase.auth.signInWithPassword({
-          email: formData.email,
+          email: trimmedEmail,
           password: formData.password,
         });
 
         if (signInError) throw signInError;
-        
+
         if (data.session) {
-          navigate('/'); // Redirect to home page after successful login
+          navigate('/');
         }
       } else {
         const { data, error: signUpError } = await supabase.auth.signUp({
-          email: formData.email,
+          email: trimmedEmail,
           password: formData.password,
           options: {
             data: {
@@ -80,13 +81,11 @@ export default function Auth() {
         if (signUpError) throw signUpError;
 
         if (data.user) {
-          // Show success message for sign up
           alert('Successfully signed up! Please check your email to confirm your account.');
           setIsLogin(true);
         }
       }
     } catch (error: any) {
-      console.error('Authentication error:', error);
       setError(error.message || 'An error occurred during authentication');
     } finally {
       setLoading(false);
@@ -99,7 +98,7 @@ export default function Auth() {
       ...prev,
       [name]: value
     }));
-    // Clear error when user starts typing
+
     if (errors[name as keyof typeof errors]) {
       setErrors(prev => ({
         ...prev,
@@ -116,7 +115,6 @@ export default function Auth() {
         className="w-full max-w-md"
       >
         <div className="bg-gray-800 rounded-2xl shadow-xl p-8">
-          {/* Auth Type Toggle */}
           <div className="flex mb-8 bg-gray-700 rounded-lg p-1">
             <button
               onClick={() => setIsLogin(true)}
@@ -144,7 +142,6 @@ export default function Auth() {
           )}
 
           <form onSubmit={handleSubmit} className="space-y-6">
-            {/* Email Field */}
             <div>
               <div className="relative">
                 <Mail className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
@@ -164,7 +161,6 @@ export default function Auth() {
               )}
             </div>
 
-            {/* Username Field (Sign Up only) */}
             {!isLogin && (
               <div>
                 <div className="relative">
@@ -186,7 +182,6 @@ export default function Auth() {
               </div>
             )}
 
-            {/* Password Field */}
             <div>
               <div className="relative">
                 <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
@@ -206,7 +201,6 @@ export default function Auth() {
               )}
             </div>
 
-            {/* Submit Button */}
             <button
               type="submit"
               disabled={loading}
