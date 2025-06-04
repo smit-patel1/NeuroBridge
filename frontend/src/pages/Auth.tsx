@@ -4,6 +4,8 @@ import { Mail, Lock, User, Loader2, AlertCircle, LogIn } from 'lucide-react';
 import { supabase } from '@/lib/supabaseClient';
 import { useNavigate } from 'react-router-dom';
 
+// Trigger Vercel redeploy: minor formatting update
+
 export default function Auth() {
   const navigate = useNavigate();
   const [isLogin, setIsLogin] = useState(true);
