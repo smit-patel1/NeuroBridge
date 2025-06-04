@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { Loader2, AlertCircle, ChevronDown, Code, MessageSquare, Lightbulb, RefreshCw } from 'lucide-react';
+import { Loader2, AlertCircle, ChevronDown, Code, MessageSquare, Lightbulb, RefreshCw, MoreHorizontal } from 'lucide-react';
 
 const subjects = ['Mathematics', 'Physics', 'Computer Science'];
 
@@ -20,7 +20,20 @@ export default function Demo() {
   const [rawResponse, setRawResponse] = useState('');
   const [followUpPrompt, setFollowUpPrompt] = useState('');
   const [showTechnicalDetails, setShowTechnicalDetails] = useState(false);
+  const [showFollowUpOptions, setShowFollowUpOptions] = useState(false);
+  const followUpRef = useRef<HTMLDivElement>(null);
   const iframeRef = useRef<HTMLIFrameElement>(null);
+
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (followUpRef.current && !followUpRef.current.contains(event.target as Node)) {
+        setShowFollowUpOptions(false);
+      }
+    };
+
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
 
   // Create isolated simulation in iframe
   const createSimulationDocument = (canvasHtml: string, jsCode: string): string => {
@@ -166,19 +179,16 @@ export default function Demo() {
     setFollowUpPrompt('');
   };
 
-  const resetSimulation = () => {
-    setSimulationData(null);
-    setError('');
-    if (iframeRef.current) {
-      iframeRef.current.srcdoc = '';
-    }
+  const selectFollowUpOption = (question: string) => {
+    setFollowUpPrompt(question);
+    setShowFollowUpOptions(false);
   };
 
   return (
     <div className="min-h-screen bg-gray-900 pt-16">
       <div className="flex h-[calc(100vh-4rem)]">
         {/* Left Sidebar - Fixed 300px width */}
-        <div className="w-[300px] bg-gray-800 p-6 flex flex-col">
+        <div className="w-[300px] bg-gray-800 p-6 flex flex-col overflow-hidden">
           <div className="mb-4">
             <label className="block text-sm font-medium text-gray-300 mb-2">Subject</label>
             <div className="relative">
@@ -216,21 +226,32 @@ export default function Demo() {
 
           {/* Follow Up Section - Integrated with prompt area */}
           <div className="border-t border-gray-700 pt-4">
-            <h3 className="text-lg font-semibold text-white mb-4 flex items-center">
-              <RefreshCw className="w-5 h-5 mr-2" />
-              Follow Up
-            </h3>
-            
-            <div className="flex flex-wrap gap-2 mb-4">
-              {commonQuestions.map((question) => (
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-lg font-semibold text-white flex items-center">
+                <RefreshCw className="w-5 h-5 mr-2" />
+                Follow Up
+              </h3>
+              <div className="relative" ref={followUpRef}>
                 <button
-                  key={question}
-                  onClick={() => setFollowUpPrompt(question)}
-                  className="bg-gray-700 text-white px-3 py-1.5 rounded-lg hover:bg-gray-600 transition-colors text-sm focus:ring-2 focus:ring-blue-500"
+                  onClick={() => setShowFollowUpOptions(!showFollowUpOptions)}
+                  className="p-2 hover:bg-gray-700 rounded-lg transition-colors"
                 >
-                  {question}
+                  <MoreHorizontal className="w-5 h-5 text-gray-400" />
                 </button>
-              ))}
+                {showFollowUpOptions && (
+                  <div className="absolute right-0 mt-2 w-64 bg-gray-700 rounded-lg shadow-lg py-2 z-50">
+                    {commonQuestions.map((question) => (
+                      <button
+                        key={question}
+                        onClick={() => selectFollowUpOption(question)}
+                        className="w-full text-left px-4 py-2 text-gray-300 hover:bg-gray-600 transition-colors"
+                      >
+                        {question}
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
             </div>
 
             <div className="flex gap-2">
@@ -283,7 +304,7 @@ export default function Demo() {
                   {!simulationData && !loading && !error && (
                     <div className="text-gray-400 text-center p-8">
                       <MessageSquare className="w-12 h-12 mx-auto mb-4 opacity-50" />
-                      <p>Enter a prompt and click "Run Simulation\" to get started</p>
+                      <p>Enter a prompt and click "Run Simulation" to get started</p>
                     </div>
                   )}
                   
