@@ -1,6 +1,6 @@
 import React from 'react';
 import { Link } from 'react-router-dom';
-import { Github } from 'lucide-react';
+import { Github, LogIn } from 'lucide-react';
 
 export default function Navbar() {
   return (
@@ -29,6 +29,13 @@ export default function Navbar() {
             >
               <Github className="w-5 h-5" />
             </a>
+            <Link 
+              to="/auth" 
+              className="bg-yellow-500 text-black px-4 py-2 rounded-lg hover:bg-yellow-400 transition-colors flex items-center space-x-2"
+            >
+              <LogIn className="w-4 h-4" />
+              <span>Login</span>
+            </Link>
           </div>
         </div>
       </div>

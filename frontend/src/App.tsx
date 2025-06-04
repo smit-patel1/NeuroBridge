@@ -4,6 +4,7 @@ import Navbar from './components/Navbar';
 import Home from './pages/Home';
 import Demo from './pages/Demo';
 import LearnMore from './pages/LearnMore';
+import Auth from './pages/Auth';
 
 function App() {
   return (
@@ -14,6 +15,7 @@ function App() {
           <Route path="/" element={<Home />} />
           <Route path="/demo" element={<Demo />} />
           <Route path="/learn" element={<LearnMore />} />
+          <Route path="/auth" element={<Auth />} />
         </Routes>
       </div>
     </Router>
