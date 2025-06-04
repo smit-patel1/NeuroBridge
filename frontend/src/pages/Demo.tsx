@@ -290,7 +290,7 @@ export default function Demo() {
                   <div className="bg-white rounded-lg overflow-hidden min-h-[400px]">
                     {!simulationData && !loading && !error && (
                       <div className="flex items-center justify-center h-[400px] text-gray-500">
-                        Enter a prompt and click "Run Simulation" to get started
+                        Enter a prompt and click "Run Simulation\" to get started
                       </div>
                     )}
                     
