@@ -1,7 +1,14 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { Loader2, AlertCircle, ChevronDown, Code } from 'lucide-react';
+import { Loader2, AlertCircle, ChevronDown, Code, MessageSquare, Lightbulb, RefreshCw } from 'lucide-react';
 
 const subjects = ['Mathematics', 'Physics', 'Computer Science'];
+
+const commonQuestions = [
+  'Can you explain this in simpler terms?',
+  'Show me a different example',
+  'Make it more complex',
+  'Slow down the animation'
+];
 
 export default function Demo() {
   const [prompt, setPrompt] = useState('');
@@ -12,6 +19,8 @@ export default function Demo() {
   const [simulationData, setSimulationData] = useState<{canvasHtml: string, jsCode: string} | null>(null);
   const [showConsole, setShowConsole] = useState(false);
   const [rawResponse, setRawResponse] = useState('');
+  const [followUpPrompt, setFollowUpPrompt] = useState('');
+  const [showTechnicalDetails, setShowTechnicalDetails] = useState(false);
   const iframeRef = useRef<HTMLIFrameElement>(null);
 
   // Create isolated simulation in iframe
@@ -51,14 +60,12 @@ export default function Demo() {
         ${canvasHtml}
         
         <script>
-          // Error handling wrapper
           window.onerror = function(message, source, lineno, colno, error) {
             console.error('Simulation Error:', message, error);
             document.body.innerHTML = '<div class="error"><h3>Simulation Error</h3><p>' + message + '</p></div>';
             return true;
           };
           
-          // Timeout to prevent infinite loops
           setTimeout(function() {
             try {
               ${jsCode}
@@ -73,17 +80,13 @@ export default function Demo() {
     `;
   };
 
-  // Load simulation into iframe
   useEffect(() => {
     if (simulationData && iframeRef.current) {
       try {
         const iframe = iframeRef.current;
         const doc = createSimulationDocument(simulationData.canvasHtml, simulationData.jsCode);
-        
-        // Write document to iframe
         iframe.srcdoc = doc;
         
-        // Listen for iframe errors
         iframe.onload = () => {
           console.log('✓ Simulation loaded successfully in iframe');
         };
@@ -158,6 +161,13 @@ export default function Demo() {
     }
   };
 
+  const handleFollowUp = async () => {
+    if (!followUpPrompt.trim()) return;
+    // Implementation for follow-up request would go here
+    console.log('Follow-up:', followUpPrompt);
+    setFollowUpPrompt('');
+  };
+
   const resetSimulation = () => {
     setSimulationData(null);
     setError('');
@@ -169,9 +179,12 @@ export default function Demo() {
   return (
     <div className="min-h-screen bg-gray-900 pt-16">
       <div className="flex h-[calc(100vh-4rem)]">
-        {/* Left Sidebar */}
-        <div className="w-80 bg-gray-800 p-6 flex flex-col">
-          <h2 className="text-xl font-bold text-white mb-6">Simulation Prompt</h2>
+        {/* Left Sidebar - Now wider */}
+        <div className="w-[800px] bg-gray-800 p-6 flex flex-col">
+          <h2 className="text-xl font-bold text-white mb-6 flex items-center">
+            <MessageSquare className="w-5 h-5 mr-2" />
+            Simulation Prompt
+          </h2>
 
           <div className="mb-4">
             <label className="block text-sm font-medium text-gray-300 mb-2">Subject</label>
@@ -179,7 +192,7 @@ export default function Demo() {
               <select
                 value={subject}
                 onChange={(e) => setSubject(e.target.value)}
-                className="w-full bg-gray-700 text-white rounded-lg py-2 px-3 appearance-none cursor-pointer"
+                className="w-full bg-gray-700 text-white rounded-lg py-2 px-3 appearance-none cursor-pointer hover:bg-gray-600 transition-colors"
               >
                 {subjects.map((s) => (
                   <option key={s} value={s}>{s}</option>
@@ -195,77 +208,151 @@ export default function Demo() {
               value={prompt}
               onChange={(e) => setPrompt(e.target.value)}
               placeholder="Describe what you want to simulate..."
-              className="w-full h-48 bg-gray-700 text-white rounded-lg p-3 resize-none"
+              className="w-full h-48 bg-gray-700 text-white rounded-lg p-3 resize-none hover:bg-gray-600 transition-colors focus:ring-2 focus:ring-blue-500 focus:outline-none"
             />
           </div>
 
           <button
             onClick={runSimulation}
             disabled={loading || !prompt.trim()}
-            className="bg-yellow-500 text-black py-3 px-4 rounded-lg font-semibold hover:bg-yellow-400 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center mb-2"
+            className="bg-yellow-500 text-black py-3 px-4 rounded-lg font-semibold hover:bg-yellow-400 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center mb-4 transition-colors"
           >
             {loading ? <Loader2 className="w-5 h-5 animate-spin mr-2" /> : null}
             Run Simulation
           </button>
 
-          {simulationData && (
-            <button
-              onClick={resetSimulation}
-              className="bg-gray-600 text-white py-2 px-4 rounded-lg font-medium hover:bg-gray-700"
-            >
-              Reset Simulation
-            </button>
-          )}
+          {/* Follow Up Section */}
+          <div className="border-t border-gray-700 pt-4 mt-2">
+            <h3 className="text-lg font-semibold text-white mb-4 flex items-center">
+              <RefreshCw className="w-5 h-5 mr-2" />
+              Follow Up
+            </h3>
+            
+            <div className="flex flex-wrap gap-2 mb-4">
+              {commonQuestions.map((question) => (
+                <button
+                  key={question}
+                  onClick={() => setFollowUpPrompt(question)}
+                  className="bg-gray-700 text-white px-4 py-2 rounded-lg hover:bg-gray-600 transition-colors text-sm"
+                >
+                  {question}
+                </button>
+              ))}
+            </div>
+
+            <div className="flex gap-2">
+              <input
+                type="text"
+                value={followUpPrompt}
+                onChange={(e) => setFollowUpPrompt(e.target.value)}
+                placeholder="Ask a follow-up question..."
+                className="flex-1 bg-gray-700 text-white rounded-lg px-4 py-2 focus:ring-2 focus:ring-blue-500 focus:outline-none"
+              />
+              <button
+                onClick={handleFollowUp}
+                disabled={!followUpPrompt.trim()}
+                className="bg-blue-500 text-white px-4 py-2 rounded-lg hover:bg-blue-400 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+              >
+                Send
+              </button>
+            </div>
+          </div>
         </div>
 
         {/* Main Content */}
         <div className="flex-1 flex flex-col">
           <div className="flex-1 p-6 overflow-auto">
-            <div className="bg-gray-800 rounded-lg h-full flex flex-col">
-              <div className="border-b border-gray-700 p-4">
-                <h2 className="text-xl font-bold text-white">Simulation</h2>
+            <div className="grid grid-cols-[1fr,300px] gap-6 h-full">
+              {/* Simulation Panel */}
+              <div className="bg-gray-800 rounded-lg flex flex-col">
+                <div className="border-b border-gray-700 p-4">
+                  <h2 className="text-xl font-bold text-white">Simulation</h2>
+                </div>
+
+                <div className="flex-1 p-4 overflow-auto">
+                  {suggestion && (
+                    <div className="mb-4 bg-yellow-500/10 border border-yellow-500/20 rounded-lg p-4 text-yellow-200 flex items-start">
+                      <AlertCircle className="w-5 h-5 mr-2 flex-shrink-0 mt-0.5" />
+                      <div>
+                        <p className="font-semibold">Prompt unclear</p>
+                        <p>Try this: {suggestion}</p>
+                      </div>
+                    </div>
+                  )}
+
+                  {error && (
+                    <div className="mb-4 bg-red-500/10 border border-red-500/20 rounded-lg p-4 text-red-200 flex items-start">
+                      <AlertCircle className="w-5 h-5 mr-2 flex-shrink-0 mt-0.5" />
+                      <div className="text-sm">{error}</div>
+                    </div>
+                  )}
+
+                  <div className="bg-white rounded-lg overflow-hidden min-h-[400px]">
+                    {!simulationData && !loading && !error && (
+                      <div className="flex items-center justify-center h-[400px] text-gray-500">
+                        Enter a prompt and click "Run Simulation" to get started
+                      </div>
+                    )}
+                    
+                    {loading && (
+                      <div className="flex items-center justify-center h-[400px] text-gray-500">
+                        <Loader2 className="w-6 h-6 animate-spin mr-3" />
+                        Generating simulation...
+                      </div>
+                    )}
+                    
+                    {simulationData && (
+                      <iframe
+                        ref={iframeRef}
+                        className="w-full h-[400px] border-0"
+                        title="Simulation"
+                        sandbox="allow-scripts allow-same-origin"
+                      />
+                    )}
+                  </div>
+                </div>
               </div>
 
-              <div className="flex-1 p-4 overflow-auto">
-                {suggestion && (
-                  <div className="mb-4 bg-yellow-500/10 border border-yellow-500/20 rounded-lg p-4 text-yellow-200 flex items-start">
-                    <AlertCircle className="w-5 h-5 mr-2 flex-shrink-0 mt-0.5" />
-                    <div>
-                      <p className="font-semibold">Prompt unclear</p>
-                      <p>Try this: {suggestion}</p>
-                    </div>
-                  </div>
-                )}
+              {/* Explanation Panel */}
+              <div className="bg-gray-800 rounded-lg flex flex-col">
+                <div className="border-b border-gray-700 p-4 flex items-center justify-between">
+                  <h2 className="text-xl font-bold text-white flex items-center">
+                    <Lightbulb className="w-5 h-5 mr-2" />
+                    Explanation
+                  </h2>
+                  <button
+                    onClick={() => setShowTechnicalDetails(!showTechnicalDetails)}
+                    className="text-sm text-gray-400 hover:text-white transition-colors"
+                  >
+                    {showTechnicalDetails ? 'Show Simple' : 'Show Technical'}
+                  </button>
+                </div>
 
-                {error && (
-                  <div className="mb-4 bg-red-500/10 border border-red-500/20 rounded-lg p-4 text-red-200 flex items-start">
-                    <AlertCircle className="w-5 h-5 mr-2 flex-shrink-0 mt-0.5" />
-                    <div className="text-sm">{error}</div>
-                  </div>
-                )}
+                <div className="flex-1 p-4 overflow-auto">
+                  {!simulationData ? (
+                    <div className="text-gray-400 text-center">
+                      Run a simulation to see the explanation
+                    </div>
+                  ) : (
+                    <div className="space-y-4">
+                      <div className="bg-gray-700/50 rounded-lg p-4">
+                        <h3 className="text-lg font-semibold text-white mb-3">Key Points</h3>
+                        <ul className="list-disc list-inside space-y-2 text-gray-300">
+                          <li>Point 1 about the simulation</li>
+                          <li>Point 2 about the simulation</li>
+                          <li>Point 3 about the simulation</li>
+                        </ul>
+                      </div>
 
-                {/* Simulation Container - Using Iframe for Complete Isolation */}
-                <div className="bg-white rounded-lg overflow-hidden min-h-[400px]">
-                  {!simulationData && !loading && !error && (
-                    <div className="flex items-center justify-center h-[400px] text-gray-500">
-                      Enter a prompt and click "Run Simulation" to get started
+                      {showTechnicalDetails && (
+                        <div className="bg-gray-700/50 rounded-lg p-4">
+                          <h3 className="text-lg font-semibold text-white mb-3">Technical Details</h3>
+                          <pre className="text-sm text-gray-300 whitespace-pre-wrap">
+                            {/* Technical details would go here */}
+                          </pre>
+                        </div>
+                      )}
                     </div>
-                  )}
-                  
-                  {loading && (
-                    <div className="flex items-center justify-center h-[400px] text-gray-500">
-                      <Loader2 className="w-6 h-6 animate-spin mr-3" />
-                      Generating simulation...
-                    </div>
-                  )}
-                  
-                  {simulationData && (
-                    <iframe
-                      ref={iframeRef}
-                      className="w-full h-[400px] border-0"
-                      title="Simulation"
-                      sandbox="allow-scripts allow-same-origin"
-                    />
                   )}
                 </div>
               </div>
