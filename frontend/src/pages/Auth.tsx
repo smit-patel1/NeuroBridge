@@ -1,6 +1,6 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
-import { Mail, Lock, User, Loader2, AlertCircle } from 'lucide-react';
+import { Mail, Lock, User, Loader2, AlertCircle, LogIn } from 'lucide-react';
 import { supabase } from '@/lib/supabaseClient';
 import { useNavigate } from 'react-router-dom';
 
@@ -19,6 +19,14 @@ export default function Auth() {
     username: '',
     password: ''
   });
+
+  useEffect(() => {
+    supabase.auth.onAuthStateChange((event, session) => {
+      if (event === 'SIGNED_IN' && session) {
+        navigate('/');
+      }
+    });
+  }, [navigate]);
 
   const validateForm = () => {
     const newErrors = {
@@ -90,6 +98,12 @@ export default function Auth() {
     } finally {
       setLoading(false);
     }
+  };
+
+  const handleGoogleSignIn = async () => {
+    await supabase.auth.signInWithOAuth({
+      provider: 'google',
+    });
   };
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -213,6 +227,16 @@ export default function Auth() {
               )}
             </button>
           </form>
+
+          <div className="mt-6">
+            <button
+              onClick={handleGoogleSignIn}
+              className="w-full bg-white text-black py-3 rounded-lg font-semibold border hover:bg-gray-100 transition-colors flex items-center justify-center space-x-2"
+            >
+              <LogIn className="w-5 h-5" />
+              <span>Continue with Google</span>
+            </button>
+          </div>
         </div>
       </motion.div>
     </div>
