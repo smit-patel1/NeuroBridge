@@ -312,7 +312,7 @@ export default function Demo() {
                   {!simulationData && !loading && !error && (
                     <div className="text-gray-400 text-center p-8">
                       <MessageSquare className="w-12 h-12 mx-auto mb-4 opacity-50" />
-                      <p>Enter a prompt and click "Run Simulation" to get started</p>
+                      <p>Enter a prompt and click "Run Simulation\" to get started</p>
                     </div>
                   )}
                   
