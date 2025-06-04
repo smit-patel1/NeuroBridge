@@ -35,7 +35,6 @@ export default function Demo() {
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
 
-  // Create isolated simulation in iframe
   const createSimulationDocument = (canvasHtml: string, jsCode: string): string => {
     return `
       <!DOCTYPE html>
@@ -47,15 +46,20 @@ export default function Demo() {
         <style>
           body { 
             margin: 0; 
-            padding: 20px; 
+            padding: 0; 
             font-family: Arial, sans-serif;
             background: #f8f9fa;
+            width: 100%;
+            height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            overflow: hidden;
           }
           canvas { 
-            display: block; 
-            margin: 0 auto;
-            border: 1px solid #ddd;
-            background: white;
+            max-width: 100%;
+            max-height: 100%;
+            object-fit: contain;
           }
           .error {
             background: #f8d7da;
@@ -224,7 +228,7 @@ export default function Demo() {
             Run Simulation
           </button>
 
-          {/* Follow Up Section - Integrated with prompt area */}
+          {/* Follow Up Section */}
           <div className="border-t border-gray-700 pt-4">
             <div className="flex items-center justify-between mb-4">
               <h3 className="text-lg font-semibold text-white flex items-center">
@@ -239,7 +243,7 @@ export default function Demo() {
                   <MoreHorizontal className="w-5 h-5 text-gray-400" />
                 </button>
                 {showFollowUpOptions && (
-                  <div className="absolute right-0 mt-2 w-64 bg-gray-700 rounded-lg shadow-lg py-2 z-50">
+                  <div className="absolute bottom-full right-0 mb-2 w-64 bg-gray-700 rounded-lg shadow-lg py-2 z-50">
                     {commonQuestions.map((question) => (
                       <button
                         key={question}
@@ -277,34 +281,38 @@ export default function Demo() {
         <div className="flex-1 p-6">
           <div className="grid grid-cols-[1fr,300px] gap-6 h-full">
             {/* Simulation Panel */}
-            <div className="bg-gray-800 rounded-lg flex flex-col">
+            <div className="bg-gray-800 rounded-lg flex flex-col overflow-hidden">
               <div className="border-b border-gray-700 p-4">
                 <h2 className="text-xl font-bold text-white">Simulation</h2>
               </div>
 
-              <div className="flex-1 p-4">
+              <div className="flex-1 flex flex-col">
                 {suggestion && (
-                  <div className="mb-4 bg-yellow-500/10 border border-yellow-500/20 rounded-lg p-4 text-yellow-200 flex items-start">
-                    <AlertCircle className="w-5 h-5 mr-2 flex-shrink-0 mt-0.5" />
-                    <div>
-                      <p className="font-semibold">Prompt unclear</p>
-                      <p>Try this: {suggestion}</p>
+                  <div className="p-4">
+                    <div className="bg-yellow-500/10 border border-yellow-500/20 rounded-lg p-4 text-yellow-200 flex items-start">
+                      <AlertCircle className="w-5 h-5 mr-2 flex-shrink-0 mt-0.5" />
+                      <div>
+                        <p className="font-semibold">Prompt unclear</p>
+                        <p>Try this: {suggestion}</p>
+                      </div>
                     </div>
                   </div>
                 )}
 
                 {error && (
-                  <div className="mb-4 bg-red-500/10 border border-red-500/20 rounded-lg p-4 text-red-200 flex items-start">
-                    <AlertCircle className="w-5 h-5 mr-2 flex-shrink-0 mt-0.5" />
-                    <div className="text-sm">{error}</div>
+                  <div className="p-4">
+                    <div className="bg-red-500/10 border border-red-500/20 rounded-lg p-4 text-red-200 flex items-start">
+                      <AlertCircle className="w-5 h-5 mr-2 flex-shrink-0 mt-0.5" />
+                      <div className="text-sm">{error}</div>
+                    </div>
                   </div>
                 )}
 
-                <div className="bg-gray-900 rounded-lg overflow-hidden min-h-[400px] flex items-center justify-center">
+                <div className="flex-1 bg-gray-900 flex items-center justify-center">
                   {!simulationData && !loading && !error && (
                     <div className="text-gray-400 text-center p-8">
                       <MessageSquare className="w-12 h-12 mx-auto mb-4 opacity-50" />
-                      <p>Enter a prompt and click "Run Simulation\" to get started</p>
+                      <p>Enter a prompt and click "Run Simulation" to get started</p>
                     </div>
                   )}
                   
