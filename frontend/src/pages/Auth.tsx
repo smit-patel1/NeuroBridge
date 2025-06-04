@@ -1,10 +1,14 @@
 import React, { useState } from 'react';
 import { motion } from 'framer-motion';
-import { Mail, Lock, User, Loader2 } from 'lucide-react';
+import { Mail, Lock, User, Loader2, AlertCircle } from 'lucide-react';
+import { supabase } from '@/lib/supabaseClient';
+import { useNavigate } from 'react-router-dom';
 
 export default function Auth() {
+  const navigate = useNavigate();
   const [isLogin, setIsLogin] = useState(true);
   const [loading, setLoading] = useState(false);
+  const [error, setError] = useState('');
   const [formData, setFormData] = useState({
     email: '',
     username: '',
@@ -23,13 +27,13 @@ export default function Auth() {
       password: ''
     };
     
-    if (!isLogin && !formData.email) {
+    if (!formData.email) {
       newErrors.email = 'Email is required';
-    } else if (!isLogin && !/\S+@\S+\.\S+/.test(formData.email)) {
+    } else if (!/\S+@\S+\.\S+/.test(formData.email)) {
       newErrors.email = 'Invalid email format';
     }
     
-    if (!formData.username) {
+    if (!isLogin && !formData.username) {
       newErrors.username = 'Username is required';
     }
     
@@ -48,11 +52,42 @@ export default function Auth() {
     if (!validateForm()) return;
     
     setLoading(true);
+    setError('');
+
     try {
-      // TODO: Implement authentication logic
-      console.log('Form submitted:', formData);
-    } catch (error) {
+      if (isLogin) {
+        const { data, error: signInError } = await supabase.auth.signInWithPassword({
+          email: formData.email,
+          password: formData.password,
+        });
+
+        if (signInError) throw signInError;
+        
+        if (data.session) {
+          navigate('/'); // Redirect to home page after successful login
+        }
+      } else {
+        const { data, error: signUpError } = await supabase.auth.signUp({
+          email: formData.email,
+          password: formData.password,
+          options: {
+            data: {
+              username: formData.username,
+            },
+          },
+        });
+
+        if (signUpError) throw signUpError;
+
+        if (data.user) {
+          // Show success message for sign up
+          alert('Successfully signed up! Please check your email to confirm your account.');
+          setIsLogin(true);
+        }
+      }
+    } catch (error: any) {
       console.error('Authentication error:', error);
+      setError(error.message || 'An error occurred during authentication');
     } finally {
       setLoading(false);
     }
@@ -101,48 +136,55 @@ export default function Auth() {
             </button>
           </div>
 
-          <form onSubmit={handleSubmit} className="space-y-6">
-            {/* Email Field (Sign Up only) */}
-            {!isLogin && (
-              <div>
-                <div className="relative">
-                  <Mail className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
-                  <input
-                    type="email"
-                    name="email"
-                    placeholder="Email"
-                    value={formData.email}
-                    onChange={handleInputChange}
-                    className={`w-full bg-gray-700 text-white rounded-lg py-3 pl-12 pr-4 outline-none focus:ring-2 ${
-                      errors.email ? 'ring-2 ring-red-500' : 'focus:ring-blue-500'
-                    }`}
-                  />
-                </div>
-                {errors.email && (
-                  <p className="mt-1 text-sm text-red-500">{errors.email}</p>
-                )}
-              </div>
-            )}
+          {error && (
+            <div className="mb-6 bg-red-500/10 border border-red-500/20 rounded-lg p-4 text-red-200 flex items-start">
+              <AlertCircle className="w-5 h-5 mr-2 flex-shrink-0 mt-0.5" />
+              <div>{error}</div>
+            </div>
+          )}
 
-            {/* Username Field */}
+          <form onSubmit={handleSubmit} className="space-y-6">
+            {/* Email Field */}
             <div>
               <div className="relative">
-                <User className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
+                <Mail className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
                 <input
-                  type="text"
-                  name="username"
-                  placeholder="Username"
-                  value={formData.username}
+                  type="email"
+                  name="email"
+                  placeholder="Email"
+                  value={formData.email}
                   onChange={handleInputChange}
                   className={`w-full bg-gray-700 text-white rounded-lg py-3 pl-12 pr-4 outline-none focus:ring-2 ${
-                    errors.username ? 'ring-2 ring-red-500' : 'focus:ring-blue-500'
+                    errors.email ? 'ring-2 ring-red-500' : 'focus:ring-blue-500'
                   }`}
                 />
               </div>
-              {errors.username && (
-                <p className="mt-1 text-sm text-red-500">{errors.username}</p>
+              {errors.email && (
+                <p className="mt-1 text-sm text-red-500">{errors.email}</p>
               )}
             </div>
+
+            {/* Username Field (Sign Up only) */}
+            {!isLogin && (
+              <div>
+                <div className="relative">
+                  <User className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
+                  <input
+                    type="text"
+                    name="username"
+                    placeholder="Username"
+                    value={formData.username}
+                    onChange={handleInputChange}
+                    className={`w-full bg-gray-700 text-white rounded-lg py-3 pl-12 pr-4 outline-none focus:ring-2 ${
+                      errors.username ? 'ring-2 ring-red-500' : 'focus:ring-blue-500'
+                    }`}
+                  />
+                </div>
+                {errors.username && (
+                  <p className="mt-1 text-sm text-red-500">{errors.username}</p>
+                )}
+              </div>
+            )}
 
             {/* Password Field */}
             <div>
