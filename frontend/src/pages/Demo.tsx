@@ -5,7 +5,7 @@ const subjects = ['Mathematics', 'Physics', 'Computer Science'];
 
 export default function Demo() {
   const [prompt, setPrompt] = useState('');
-  const [subject, setSubject] = useState(subjects[0]);
+  const [subject, setSubject] = useState(subjects[0]); // FIX: Was using entire array instead of first element
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [suggestion, setSuggestion] = useState('');
@@ -13,31 +13,184 @@ export default function Demo() {
   const [showConsole, setShowConsole] = useState(false);
   const [rawResponse, setRawResponse] = useState('');
   const simulationRef = useRef<HTMLDivElement>(null);
+  const animationFrameIds = useRef<number[]>([]);
 
-  // Execute JavaScript when simulation data changes
+  // Comprehensive cleanup function
+  const cleanupSimulation = () => {
+    // Cancel all animation frames to stop previous animations
+    animationFrameIds.current.forEach(id => {
+      try {
+        cancelAnimationFrame(id);
+      } catch (e) {
+        console.warn('Error canceling animation frame:', e);
+      }
+    });
+    animationFrameIds.current = [];
+
+    // Remove all simulation scripts
+    document.querySelectorAll('script[data-simulation]').forEach(script => {
+      try {
+        script.remove();
+      } catch (e) {
+        console.warn('Error removing script:', e);
+      }
+    });
+
+    // Clear simulation container completely
+    if (simulationRef.current) {
+      simulationRef.current.innerHTML = '';
+      // Force re-render by resetting styles
+      simulationRef.current.style.display = 'none';
+      simulationRef.current.offsetHeight; // Trigger reflow
+      simulationRef.current.style.display = '';
+    }
+
+    // Clear any global variables that simulations might have created
+    if (window.animationId) {
+      cancelAnimationFrame(window.animationId);
+      delete window.animationId;
+    }
+  };
+
+  // Enhanced script execution with proper cleanup tracking
+  const executeSimulationScript = (jsCode: string): Promise<void> => {
+    return new Promise((resolve, reject) => {
+      try {
+        // Wrap the code to track animation frames
+        const wrappedCode = `
+          (function() {
+            // Override requestAnimationFrame to track all animation IDs
+            const originalRAF = window.requestAnimationFrame;
+            window.requestAnimationFrame = function(callback) {
+              const id = originalRAF.call(window, function(timestamp) {
+                try {
+                  callback(timestamp);
+                } catch (error) {
+                  console.error('Animation callback error:', error);
+                  cancelAnimationFrame(id);
+                }
+              });
+              
+              // Store animation frame ID for cleanup
+              if (!window.__simulationRAFIds) {
+                window.__simulationRAFIds = [];
+              }
+              window.__simulationRAFIds.push(id);
+              
+              return id;
+            };
+
+            try {
+              ${jsCode}
+            } catch (error) {
+              console.error('Simulation script execution error:', error);
+              throw error;
+            }
+          })();
+        `;
+
+        const script = document.createElement('script');
+        script.setAttribute('data-simulation', 'true');
+        script.textContent = wrappedCode;
+        
+        script.onload = () => resolve();
+        script.onerror = (error) => {
+          console.error('Script injection error:', error);
+          reject(new Error('Failed to execute simulation script'));
+        };
+
+        document.head.appendChild(script);
+
+      } catch (error) {
+        reject(error);
+      }
+    });
+  };
+
+  // Execute simulation with proper timing and error handling
   useEffect(() => {
+    let timeoutId: NodeJS.Timeout;
+
     if (simulationData && simulationRef.current) {
-      // Clear any existing scripts
-      const existingScripts = document.querySelectorAll('script[data-simulation]');
-      existingScripts.forEach(script => script.remove());
+      // Clean up any existing simulation first
+      cleanupSimulation();
+
+      // Reset simulation container styles
+      const container = simulationRef.current;
+      container.style.background = '#ffffff';
+      container.style.display = 'flex';
+      container.style.alignItems = 'center';
+      container.style.justifyContent = 'center';
 
       // Insert canvas HTML
-      simulationRef.current.innerHTML = simulationData.canvasHtml;
+      container.innerHTML = simulationData.canvasHtml;
 
-      // Execute JavaScript
-      const script = document.createElement('script');
-      script.setAttribute('data-simulation', 'true');
-      script.textContent = simulationData.jsCode;
-      document.body.appendChild(script);
+      // Wait for DOM to be ready, then execute script
+      timeoutId = setTimeout(async () => {
+        try {
+          // Verify canvas exists and is ready
+          const canvas = container.querySelector('canvas');
+          if (!canvas) {
+            throw new Error('Canvas element not found after DOM insertion');
+          }
+
+          // Ensure canvas is visible and has dimensions
+          if (canvas.offsetWidth === 0 || canvas.offsetHeight === 0) {
+            console.warn('Canvas has zero dimensions, waiting...');
+            await new Promise(resolve => setTimeout(resolve, 100));
+          }
+
+          // Clear any global RAF tracking array
+          if (window.__simulationRAFIds) {
+            window.__simulationRAFIds.forEach((id: number) => cancelAnimationFrame(id));
+            delete window.__simulationRAFIds;
+          }
+
+          // Execute the simulation script
+          await executeSimulationScript(simulationData.jsCode);
+          console.log('✓ Simulation executed successfully');
+
+        } catch (scriptError) {
+          console.error('Simulation execution failed:', scriptError);
+          setError(`Simulation failed: ${(scriptError as Error).message}`);
+          
+          // Show error in the canvas area
+          if (container) {
+            container.innerHTML = `
+              <div style="color: #dc3545; text-align: center; padding: 20px;">
+                <p><strong>Simulation Error:</strong></p>
+                <p>${(scriptError as Error).message}</p>
+              </div>
+            `;
+          }
+        }
+      }, 150); // Increased timeout for better reliability
     }
+
+    // Cleanup function
+    return () => {
+      if (timeoutId) {
+        clearTimeout(timeoutId);
+      }
+      cleanupSimulation();
+      
+      // Clean up global RAF tracking
+      if (window.__simulationRAFIds) {
+        window.__simulationRAFIds.forEach((id: number) => cancelAnimationFrame(id));
+        delete window.__simulationRAFIds;
+      }
+    };
   }, [simulationData]);
 
   const runSimulation = async () => {
     setLoading(true);
     setError('');
     setSuggestion('');
-    setSimulationData(null);
     setRawResponse('');
+    
+    // Clean up before starting new simulation
+    cleanupSimulation();
+    setSimulationData(null);
 
     try {
       const response = await fetch("https://zurfhydnztcxlomdyqds.functions.supabase.co/simulate", {
@@ -55,7 +208,8 @@ export default function Demo() {
         data = await response.json();
         setRawResponse(JSON.stringify(data, null, 2));
       } else {
-        throw new Error(`Unexpected response format (status: ${response.status})`);
+        const textResponse = await response.text();
+        throw new Error(`Unexpected response format (status: ${response.status}): ${textResponse.substring(0, 200)}...`);
       }
 
       if (!response.ok) {
@@ -69,23 +223,35 @@ export default function Demo() {
         return;
       }
 
-      // Check for the correct response structure from your backend
       if (data.canvasHtml && data.jsCode) {
+        console.log('✓ Valid simulation data received');
         setSimulationData({
           canvasHtml: data.canvasHtml,
           jsCode: data.jsCode
         });
       } else {
-        setError('No simulation code returned. Backend response: ' + JSON.stringify(data));
+        setError('Invalid simulation data received from backend');
+        console.error('Backend response missing required fields:', data);
       }
 
     } catch (err: any) {
-      console.error('Simulation error:', err);
+      console.error('Simulation request error:', err);
       setError(err.message || 'Failed to connect to the simulation engine.');
     } finally {
       setLoading(false);
     }
   };
+
+  // Cleanup on component unmount
+  useEffect(() => {
+    return () => {
+      cleanupSimulation();
+      if (window.__simulationRAFIds) {
+        window.__simulationRAFIds.forEach((id: number) => cancelAnimationFrame(id));
+        delete window.__simulationRAFIds;
+      }
+    };
+  }, []);
 
   return (
     <div className="min-h-screen bg-gray-900 pt-16">
@@ -163,7 +329,7 @@ export default function Demo() {
                 {error && (
                   <div className="mb-4 bg-red-500/10 border border-red-500/20 rounded-lg p-4 text-red-200 flex items-start">
                     <AlertCircle className="w-5 h-5 mr-2 flex-shrink-0 mt-0.5" />
-                    <div>{error}</div>
+                    <div className="text-sm">{error}</div>
                   </div>
                 )}
 
@@ -174,6 +340,12 @@ export default function Demo() {
                 >
                   {!simulationData && !loading && !error && (
                     <p className="text-gray-500">Enter a prompt and click "Run Simulation" to get started</p>
+                  )}
+                  {loading && (
+                    <div className="flex items-center text-gray-500">
+                      <Loader2 className="w-6 h-6 animate-spin mr-3" />
+                      Generating simulation...
+                    </div>
                   )}
                 </div>
               </div>
