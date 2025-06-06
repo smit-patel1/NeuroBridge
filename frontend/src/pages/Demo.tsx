@@ -1,5 +1,7 @@
 import React, { useState, useRef, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { Loader2, AlertCircle, ChevronDown, Code, MessageSquare, Lightbulb, RefreshCw, MoreHorizontal } from 'lucide-react';
+import { supabase } from '@/lib/supabaseClient';
 
 const subjects = ['Mathematics', 'Physics', 'Computer Science'];
 
@@ -11,6 +13,7 @@ const commonQuestions = [
 ];
 
 export default function Demo() {
+  const navigate = useNavigate();
   const [prompt, setPrompt] = useState('');
   const [subject, setSubject] = useState(subjects[0]);
   const [loading, setLoading] = useState(false);
@@ -21,8 +24,37 @@ export default function Demo() {
   const [followUpPrompt, setFollowUpPrompt] = useState('');
   const [showTechnicalDetails, setShowTechnicalDetails] = useState(false);
   const [showFollowUpOptions, setShowFollowUpOptions] = useState(false);
+  const [authLoading, setAuthLoading] = useState(true);
   const followUpRef = useRef<HTMLDivElement>(null);
   const iframeRef = useRef<HTMLIFrameElement>(null);
+
+  // Check authentication on component mount
+  useEffect(() => {
+    const checkAuth = async () => {
+      try {
+        const { data: { session } } = await supabase.auth.getSession();
+        if (!session) {
+          navigate('/auth');
+          return;
+        }
+        setAuthLoading(false);
+      } catch (error) {
+        console.error('Auth check error:', error);
+        navigate('/auth');
+      }
+    };
+
+    checkAuth();
+
+    // Listen for auth state changes
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
+      if (event === 'SIGNED_OUT' || !session) {
+        navigate('/auth');
+      }
+    });
+
+    return () => subscription.unsubscribe();
+  }, [navigate]);
 
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
@@ -187,6 +219,18 @@ export default function Demo() {
     setFollowUpPrompt(question);
     setShowFollowUpOptions(false);
   };
+
+  // Show loading screen while checking authentication
+  if (authLoading) {
+    return (
+      <div className="min-h-screen bg-gray-900 flex items-center justify-center">
+        <div className="flex items-center justify-center text-gray-400">
+          <Loader2 className="w-6 h-6 animate-spin mr-3" />
+          <span className="text-lg">Checking authentication...</span>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-gray-900 pt-16">

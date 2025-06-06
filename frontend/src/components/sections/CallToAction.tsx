@@ -14,9 +14,9 @@ export default function CallToAction() {
       >
         <h2 className="text-4xl md:text-5xl font-bold mb-6">Ready to Render Your Mind?</h2>
         <p className="text-xl mb-12">Start turning ideas into simulations today.</p>
-        <Link to="/demo">
+        <Link to="/auth">
           <button className="bg-white text-blue-600 hover:bg-gray-100 px-8 py-6 rounded-2xl text-lg font-semibold shadow-lg flex items-center">
-            Launch MindRender
+            Create Account to Start
             <ArrowRight className="ml-2 w-5 h-5" />
           </button>
         </Link>
