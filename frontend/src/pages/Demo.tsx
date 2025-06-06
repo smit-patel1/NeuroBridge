@@ -442,7 +442,7 @@ export default function Demo() {
         <div className="flex flex-col h-full">
           {/* Sidebar Header */}
           <div className="flex items-center justify-between p-4 border-b border-gray-700">
-            <h2 className="text-xl font-bold text-white">Menu</h2>
+            <h2 className="text-xl font-bold text-white">Sidebar</h2>
             <button
               onClick={() => setSidebarOpen(false)}
               className="text-gray-400 hover:text-white transition-colors"
