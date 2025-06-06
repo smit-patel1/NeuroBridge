@@ -55,7 +55,7 @@ export default function Navbar() {
               onClick={handleDemoClick}
               className="text-gray-300 hover:text-white transition-colors"
             >
-              {user ? 'Try Demo' : 'Create Account to Try Demo'}
+              {user ? 'Try Demo' : 'Try Demo'}
             </button>
             <Link to="/learn" className="text-gray-300 hover:text-white transition-colors">
               Learn More
