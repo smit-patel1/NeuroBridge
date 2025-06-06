@@ -192,7 +192,7 @@ export default function Demo() {
     <div className="min-h-screen bg-gray-900 pt-16">
       <div className="flex h-[calc(100vh-4rem)]">
         {/* Left Sidebar - Fixed 300px width */}
-        <div className="w-[300px] bg-gray-800 p-6 flex flex-col overflow-hidden">
+        <div className="w-[300px] bg-gray-800 rounded-lg m-6 mr-3 p-6 flex flex-col overflow-hidden">
           <div className="mb-4">
             <label className="block text-sm font-medium text-gray-300 mb-2">Subject</label>
             <div className="relative">
@@ -269,7 +269,7 @@ export default function Demo() {
               <button
                 onClick={handleFollowUp}
                 disabled={!followUpPrompt.trim()}
-                className="bg-blue-500 text-white px-4 py-2 rounded-lg hover:bg-blue-400 disabled:opacity-50 disabled:cursor-not-allowed transition-colors focus:ring-2 focus:ring-blue-300"
+                className="bg-blue-500 text-white px-4 py-2 rounded-lg hover:bg-blue-400 disabled:opacity-50 disabled:cursor-not-allowed transition-colors focus:ring-2 focus:ring-blue-300 flex-shrink-0"
               >
                 Send
               </button>
@@ -278,7 +278,7 @@ export default function Demo() {
         </div>
 
         {/* Main Content */}
-        <div className="flex-1 p-6">
+        <div className="flex-1 p-6 pl-3">
           <div className="grid grid-cols-[1fr,300px] gap-6 h-full">
             {/* Simulation Panel */}
             <div className="bg-gray-800 rounded-lg flex flex-col overflow-hidden">
@@ -308,18 +308,18 @@ export default function Demo() {
                   </div>
                 )}
 
-                <div className="flex-1 bg-gray-900 flex items-center justify-center">
+                <div className="flex-1 bg-gray-900 flex items-center justify-center overflow-hidden">
                   {!simulationData && !loading && !error && (
                     <div className="text-gray-400 text-center p-8">
                       <MessageSquare className="w-12 h-12 mx-auto mb-4 opacity-50" />
-                      <p>Enter a prompt and click "Run Simulation\" to get started</p>
+                      <p className="text-lg">Enter a prompt and click "Run Simulation" to get started</p>
                     </div>
                   )}
                   
                   {loading && (
                     <div className="flex items-center justify-center text-gray-400">
                       <Loader2 className="w-6 h-6 animate-spin mr-3" />
-                      Generating simulation...
+                      <span className="text-lg">Generating simulation...</span>
                     </div>
                   )}
                   
@@ -344,7 +344,7 @@ export default function Demo() {
                 </h2>
                 <button
                   onClick={() => setShowTechnicalDetails(!showTechnicalDetails)}
-                  className="px-3 py-1.5 rounded-lg bg-gray-700 text-gray-300 hover:bg-gray-600 hover:text-white transition-colors focus:ring-2 focus:ring-blue-500"
+                  className="px-3 py-1.5 rounded-lg bg-gray-700 text-gray-300 hover:bg-gray-600 hover:text-white transition-colors focus:ring-2 focus:ring-blue-500 text-sm ml-3"
                 >
                   {showTechnicalDetails ? 'Show Simple' : 'Show Technical'}
                 </button>
@@ -353,8 +353,11 @@ export default function Demo() {
               <div className="flex-1 p-4">
                 {!simulationData ? (
                   <div className="flex flex-col items-center justify-center h-full text-gray-400 p-8 text-center">
-                    <Code className="w-12 h-12 mb-4 opacity-50" />
-                    <p>Run a simulation to see the explanation</p>
+                    <div className="bg-gray-700/30 rounded-full p-6 mb-4">
+                      <Code className="w-12 h-12 opacity-70" />
+                    </div>
+                    <h3 className="text-lg font-semibold mb-2 text-gray-300">Ready to Explain</h3>
+                    <p className="text-gray-400">Run a simulation to see detailed explanations and insights</p>
                   </div>
                 ) : (
                   <div className="space-y-4">
