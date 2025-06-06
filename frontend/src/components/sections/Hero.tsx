@@ -9,19 +9,26 @@ export default function Hero() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    // Get initial session
-    const getSession = async () => {
-      const { data: { session } } = await supabase.auth.getSession();
-      setUser(session?.user || null);
+    // Get current user
+    const getCurrentUser = async () => {
+      const { data: { user } } = await supabase.auth.getUser();
+      setUser(user || null);
       setLoading(false);
     };
 
-    getSession();
+    getCurrentUser();
 
     // Listen for auth changes
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
-      setUser(session?.user || null);
-    });
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(
+      async (event, session) => {
+        if (event === 'SIGNED_OUT' || !session) {
+          setUser(null);
+        } else {
+          const { data: { user } } = await supabase.auth.getUser();
+          setUser(user || null);
+        }
+      }
+    );
 
     return () => subscription.unsubscribe();
   }, []);
