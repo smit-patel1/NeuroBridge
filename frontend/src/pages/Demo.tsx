@@ -506,40 +506,44 @@ export default function Demo() {
       <nav className="fixed w-full bg-gray-900/95 backdrop-blur-sm z-50 border-b border-gray-700">
         <div className="container mx-auto px-4 py-4">
           <div className="flex items-center justify-between">
-            {/* Left Side - Hamburger Menu */}
-            <button
-              onClick={() => setSidebarOpen(!sidebarOpen)}
-              className="bg-gray-800 hover:bg-gray-700 text-white p-2 rounded-lg shadow-lg transition-colors"
-              aria-label="Toggle sidebar"
-            >
-              <Menu className="w-5 h-5" />
-            </button>
+            {/* Left Side - Logo and Hamburger Menu */}
+            <div className="flex items-center space-x-4">
+              <h1 className="text-xl font-bold text-white">MindRender</h1>
+              <button
+                onClick={() => setSidebarOpen(!sidebarOpen)}
+                className="bg-gray-800 hover:bg-gray-700 text-white p-2 rounded-lg shadow-lg transition-colors"
+                aria-label="Toggle sidebar"
+              >
+                <Menu className="w-5 h-5" />
+              </button>
+            </div>
 
-            {/* Center - New Chat Button */}
-            <button
-              onClick={handleNewChat}
-              className="bg-yellow-500 hover:bg-yellow-400 text-black px-6 py-2 rounded-lg font-semibold transition-colors flex items-center space-x-2 shadow-lg"
-            >
-              <Sparkles className="w-4 h-4" />
-              <span>New Simulation</span>
-            </button>
+            {/* Right Side - New Chat Button and User Info */}
+            <div className="flex items-center space-x-4">
+              <button
+                onClick={handleNewChat}
+                className="bg-yellow-500 hover:bg-yellow-400 text-black px-6 py-2 rounded-lg font-semibold transition-colors flex items-center space-x-2 shadow-lg"
+              >
+                <Sparkles className="w-4 h-4" />
+                <span>New Simulation</span>
+              </button>
 
-            {/* Right Side - User Info */}
-            {user && (
-              <div className="flex items-center space-x-3">
-                <div className="flex items-center space-x-2 text-gray-300">
-                  <User className="w-4 h-4" />
-                  <span className="text-sm hidden sm:inline">{user.email}</span>
+              {user && (
+                <div className="flex items-center space-x-3">
+                  <div className="flex items-center space-x-2 text-gray-300">
+                    <User className="w-4 h-4" />
+                    <span className="text-sm hidden sm:inline">{user.email}</span>
+                  </div>
+                  <button 
+                    onClick={handleSignOut}
+                    className="bg-red-500 text-white px-4 py-2 rounded-lg hover:bg-red-400 transition-colors flex items-center space-x-2"
+                  >
+                    <LogOut className="w-4 h-4" />
+                    <span className="hidden sm:inline">Sign Out</span>
+                  </button>
                 </div>
-                <button 
-                  onClick={handleSignOut}
-                  className="bg-red-500 text-white px-4 py-2 rounded-lg hover:bg-red-400 transition-colors flex items-center space-x-2"
-                >
-                  <LogOut className="w-4 h-4" />
-                  <span className="hidden sm:inline">Sign Out</span>
-                </button>
-              </div>
-            )}
+              )}
+            </div>
           </div>
         </div>
       </nav>
@@ -558,7 +562,7 @@ export default function Demo() {
       } lg:w-72`}>
         <div className="flex flex-col h-full">
           {/* Sidebar Header */}
-          <div className="flex items-center justify-between p-4 border-b border-gray-700 mt-16">
+          <div className="flex items-center justify-between p-4 border-b border-gray-700 mt-20">
             <h2 className="text-xl font-bold text-white">Sidebar</h2>
             <button
               onClick={() => setSidebarOpen(false)}
@@ -568,7 +572,7 @@ export default function Demo() {
             </button>
           </div>
 
-          {/* Token Usage Section */}
+          {/* Token Usage Section - Moved to top */}
           <div className="p-4 border-b border-gray-700">
             <div className={`rounded-lg p-4 ${isTokenLimitReached ? 'bg-red-900/50 border border-red-500/50' : 'bg-gray-700'}`}>
               <div className="flex items-center justify-between mb-2">
@@ -618,7 +622,7 @@ export default function Demo() {
             </div>
           </div>
 
-          {/* Previous Chats Section */}
+          {/* Previous Chats Section - Moved up, directly below Token Usage */}
           <div className="flex-1 overflow-y-auto p-4">
             <h3 className="text-lg font-semibold text-white mb-4 flex items-center">
               <Clock className="w-5 h-5 mr-2" />
@@ -640,8 +644,8 @@ export default function Demo() {
             </div>
           </div>
 
-          {/* Settings Section */}
-          <div className="p-4 border-t border-gray-700">
+          {/* Settings Section - Anchored at bottom with proper spacing */}
+          <div className="p-4 border-t border-gray-700 mt-auto">
             <button
               onClick={() => {
                 setSidebarOpen(false);
@@ -882,7 +886,7 @@ export default function Demo() {
               </h2>
               <button
                 onClick={() => setShowTechnicalDetails(!showTechnicalDetails)}
-                className="px-3 py-1.5 rounded-lg bg-gray-700 text-gray-300 hover:bg-gray-600 hover:text-white transition-colors focus:ring-2 focus:ring-blue-500 text-sm"
+                className="px-3 py-1.5 rounded-lg bg-gray-700 text-gray-300 hover:bg-gray-600 hover:text-white transition-colors focus:ring-2 focus:ring-blue-500 text-sm ml-2"
               >
                 {showTechnicalDetails ? 'Show Simple' : 'Show Technical'}
               </button>
