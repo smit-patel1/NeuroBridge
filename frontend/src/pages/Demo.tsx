@@ -102,15 +102,16 @@ export default function Demo() {
     try {
       const { data, error } = await supabase
         .from('token_usage')
-        .select('tokens_used')
-        .eq('user_id', user.id);
+        .select('sum(tokens_used)')
+        .eq('user_id', user.id)
+        .single();
 
       if (error) {
         console.error('Error loading token usage:', error);
         return;
       }
 
-      const totalTokensUsed = data?.reduce((sum, row) => sum + row.tokens_used, 0) || 0;
+      const totalTokensUsed = data?.sum || 0;
       setTokensUsed(totalTokensUsed);
       console.log(`✓ Loaded token usage: ${totalTokensUsed} tokens for user ${user.id}`);
     } catch (error) {
@@ -160,6 +161,9 @@ export default function Demo() {
       // Update local token count only after successful insert
       setTokensUsed(prev => prev + tokens);
       console.log(`✓ Successfully logged ${tokens} tokens for user ${user.id}`);
+      
+      // Refresh token usage from database to ensure accuracy
+      await loadTokenUsage();
       
     } catch (error) {
       console.error('Error inserting token usage:', error);
@@ -271,6 +275,9 @@ export default function Demo() {
       return;
     }
 
+    // Refresh token usage before checking limit
+    await loadTokenUsage();
+
     // Check token limit before making request
     if (tokensUsed >= TOKEN_LIMIT) {
       setError(`You've reached your free token limit (${TOKEN_LIMIT.toLocaleString()} tokens). Please contact support for more access.`);
@@ -308,11 +315,15 @@ export default function Demo() {
 
       if (data.suggestion) {
         setSuggestion(data.suggestion);
+        // Refresh token usage even for suggestions
+        await loadTokenUsage();
         return;
       }
 
       if (data.error) {
         setError(data.error);
+        // Refresh token usage even for errors
+        await loadTokenUsage();
         return;
       }
 
@@ -347,6 +358,8 @@ export default function Demo() {
     } catch (err) {
       console.error('Simulation request error:', err);
       setError((err as Error).message || 'Failed to generate simulation');
+      // Refresh token usage even after errors
+      await loadTokenUsage();
     } finally {
       setLoading(false);
     }
@@ -363,6 +376,9 @@ export default function Demo() {
       navigate('/auth');
       return;
     }
+    
+    // Refresh token usage before checking limit
+    await loadTokenUsage();
     
     // Check token limit for follow-up requests
     if (tokensUsed >= TOKEN_LIMIT) {
@@ -397,6 +413,8 @@ export default function Demo() {
 
       if (data.error) {
         setError(data.error);
+        // Refresh token usage even for errors
+        await loadTokenUsage();
         return;
       }
 
@@ -427,6 +445,8 @@ export default function Demo() {
     } catch (err) {
       console.error('Follow-up request error:', err);
       setError((err as Error).message || 'Failed to process follow-up request');
+      // Refresh token usage even after errors
+      await loadTokenUsage();
     } finally {
       setLoading(false);
     }
@@ -466,6 +486,7 @@ export default function Demo() {
 
   const remainingTokens = TOKEN_LIMIT - tokensUsed;
   const usagePercentage = (tokensUsed / TOKEN_LIMIT) * 100;
+  const isTokenLimitReached = tokensUsed >= TOKEN_LIMIT;
 
   // Show loading screen while checking authentication
   if (authLoading) {
@@ -549,7 +570,7 @@ export default function Demo() {
 
           {/* Token Usage Section */}
           <div className="p-4 border-b border-gray-700">
-            <div className="bg-gray-700 rounded-lg p-4">
+            <div className={`rounded-lg p-4 ${isTokenLimitReached ? 'bg-red-900/50 border border-red-500/50' : 'bg-gray-700'}`}>
               <div className="flex items-center justify-between mb-2">
                 <h3 className="text-sm font-semibold text-white flex items-center">
                   <Zap className="w-4 h-4 mr-2" />
@@ -561,7 +582,9 @@ export default function Demo() {
               <div className="space-y-2">
                 <div className="flex justify-between text-sm">
                   <span className="text-gray-300">Used:</span>
-                  <span className="text-white font-medium">{tokensUsed.toLocaleString()}</span>
+                  <span className={`font-medium ${isTokenLimitReached ? 'text-red-400' : 'text-white'}`}>
+                    {tokensUsed.toLocaleString()}
+                  </span>
                 </div>
                 <div className="flex justify-between text-sm">
                   <span className="text-gray-300">Remaining:</span>
@@ -574,15 +597,23 @@ export default function Demo() {
                 <div className="w-full bg-gray-600 rounded-full h-2 mt-3">
                   <div 
                     className={`h-2 rounded-full transition-all duration-300 ${
+                      usagePercentage >= 100 ? 'bg-red-500' :
                       usagePercentage >= 90 ? 'bg-red-500' : 
                       usagePercentage >= 70 ? 'bg-yellow-500' : 'bg-green-500'
                     }`}
                     style={{ width: `${Math.min(usagePercentage, 100)}%` }}
                   />
                 </div>
-                <div className="text-xs text-gray-400 text-center">
+                <div className={`text-xs text-center ${isTokenLimitReached ? 'text-red-400' : 'text-gray-400'}`}>
                   {usagePercentage.toFixed(1)}% of {TOKEN_LIMIT.toLocaleString()} tokens
                 </div>
+                
+                {isTokenLimitReached && (
+                  <div className="mt-3 p-2 bg-red-500/20 border border-red-500/30 rounded text-xs text-red-300 text-center">
+                    <AlertCircle className="w-4 h-4 mx-auto mb-1" />
+                    Token limit reached
+                  </div>
+                )}
               </div>
             </div>
           </div>
@@ -632,7 +663,7 @@ export default function Demo() {
           {/* Left Panel - Controls */}
           <div className="w-full lg:w-80 bg-gray-800 rounded-lg p-4 lg:p-6 flex flex-col order-1 lg:order-1">
             {/* Token Usage Display - Mobile Only */}
-            <div className="mb-6 p-4 bg-gray-700 rounded-lg lg:hidden">
+            <div className={`mb-6 p-4 rounded-lg lg:hidden ${isTokenLimitReached ? 'bg-red-900/50 border border-red-500/50' : 'bg-gray-700'}`}>
               <div className="flex items-center justify-between mb-2">
                 <h3 className="text-sm font-semibold text-white flex items-center">
                   <Zap className="w-4 h-4 mr-2" />
@@ -644,7 +675,9 @@ export default function Demo() {
               <div className="space-y-2">
                 <div className="flex justify-between text-sm">
                   <span className="text-gray-300">Used:</span>
-                  <span className="text-white font-medium">{tokensUsed.toLocaleString()}</span>
+                  <span className={`font-medium ${isTokenLimitReached ? 'text-red-400' : 'text-white'}`}>
+                    {tokensUsed.toLocaleString()}
+                  </span>
                 </div>
                 <div className="flex justify-between text-sm">
                   <span className="text-gray-300">Remaining:</span>
@@ -657,15 +690,23 @@ export default function Demo() {
                 <div className="w-full bg-gray-600 rounded-full h-2 mt-3">
                   <div 
                     className={`h-2 rounded-full transition-all duration-300 ${
+                      usagePercentage >= 100 ? 'bg-red-500' :
                       usagePercentage >= 90 ? 'bg-red-500' : 
                       usagePercentage >= 70 ? 'bg-yellow-500' : 'bg-green-500'
                     }`}
                     style={{ width: `${Math.min(usagePercentage, 100)}%` }}
                   />
                 </div>
-                <div className="text-xs text-gray-400 text-center">
+                <div className={`text-xs text-center ${isTokenLimitReached ? 'text-red-400' : 'text-gray-400'}`}>
                   {usagePercentage.toFixed(1)}% of {TOKEN_LIMIT.toLocaleString()} tokens
                 </div>
+                
+                {isTokenLimitReached && (
+                  <div className="mt-3 p-2 bg-red-500/20 border border-red-500/30 rounded text-xs text-red-300 text-center">
+                    <AlertCircle className="w-4 h-4 mx-auto mb-1" />
+                    Token limit reached
+                  </div>
+                )}
               </div>
             </div>
 
@@ -675,7 +716,10 @@ export default function Demo() {
                 <select
                   value={subject}
                   onChange={(e) => setSubject(e.target.value)}
-                  className="w-full bg-gray-700 text-white rounded-lg py-2 px-3 appearance-none cursor-pointer hover:bg-gray-600 transition-colors focus:ring-2 focus:ring-blue-500"
+                  disabled={isTokenLimitReached}
+                  className={`w-full bg-gray-700 text-white rounded-lg py-2 px-3 appearance-none cursor-pointer hover:bg-gray-600 transition-colors focus:ring-2 focus:ring-blue-500 ${
+                    isTokenLimitReached ? 'opacity-50 cursor-not-allowed' : ''
+                  }`}
                 >
                   {subjects.map((s) => (
                     <option key={s} value={s}>{s}</option>
@@ -690,18 +734,25 @@ export default function Demo() {
               <textarea
                 value={prompt}
                 onChange={(e) => setPrompt(e.target.value)}
-                placeholder="Describe what you want to simulate..."
-                className="w-full h-32 lg:h-48 bg-gray-700 text-white rounded-lg p-3 resize-none hover:bg-gray-600 transition-colors focus:ring-2 focus:ring-blue-500 focus:outline-none"
+                placeholder={isTokenLimitReached ? "Token limit reached - please contact support" : "Describe what you want to simulate..."}
+                disabled={isTokenLimitReached}
+                className={`w-full h-32 lg:h-48 bg-gray-700 text-white rounded-lg p-3 resize-none hover:bg-gray-600 transition-colors focus:ring-2 focus:ring-blue-500 focus:outline-none ${
+                  isTokenLimitReached ? 'opacity-50 cursor-not-allowed' : ''
+                }`}
               />
             </div>
 
             <button
               onClick={runSimulation}
-              disabled={loading || !prompt.trim() || tokensUsed >= TOKEN_LIMIT}
-              className="bg-yellow-500 text-black py-3 px-4 rounded-lg font-semibold hover:bg-yellow-400 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center mb-6 transition-colors"
+              disabled={loading || !prompt.trim() || isTokenLimitReached}
+              className={`py-3 px-4 rounded-lg font-semibold flex items-center justify-center mb-6 transition-colors ${
+                isTokenLimitReached 
+                  ? 'bg-red-500 text-white cursor-not-allowed opacity-75' 
+                  : 'bg-yellow-500 text-black hover:bg-yellow-400 disabled:opacity-50 disabled:cursor-not-allowed'
+              }`}
             >
               {loading ? <Loader2 className="w-5 h-5 animate-spin mr-2" /> : null}
-              {tokensUsed >= TOKEN_LIMIT ? 'Token Limit Reached' : 'Run Simulation'}
+              {isTokenLimitReached ? 'Token Limit Reached' : 'Run Simulation'}
             </button>
 
             {/* Follow Up Section */}
@@ -714,11 +765,14 @@ export default function Demo() {
                 <div className="relative" ref={followUpRef}>
                   <button
                     onClick={() => setShowFollowUpOptions(!showFollowUpOptions)}
-                    className="p-2 hover:bg-gray-700 rounded-lg transition-colors"
+                    disabled={isTokenLimitReached}
+                    className={`p-2 hover:bg-gray-700 rounded-lg transition-colors ${
+                      isTokenLimitReached ? 'opacity-50 cursor-not-allowed' : ''
+                    }`}
                   >
                     <MoreHorizontal className="w-5 h-5 text-gray-400" />
                   </button>
-                  {showFollowUpOptions && (
+                  {showFollowUpOptions && !isTokenLimitReached && (
                     <div className="absolute bottom-full right-0 mb-2 w-64 bg-gray-700 rounded-lg shadow-lg py-2 z-50">
                       {commonQuestions.map((question) => (
                         <button
@@ -739,12 +793,15 @@ export default function Demo() {
                   type="text"
                   value={followUpPrompt}
                   onChange={(e) => setFollowUpPrompt(e.target.value)}
-                  placeholder="Ask a follow-up question..."
-                  className="flex-1 bg-gray-700 text-white rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:outline-none"
+                  placeholder={isTokenLimitReached ? "Token limit reached" : "Ask a follow-up question..."}
+                  disabled={isTokenLimitReached}
+                  className={`flex-1 bg-gray-700 text-white rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:outline-none ${
+                    isTokenLimitReached ? 'opacity-50 cursor-not-allowed' : ''
+                  }`}
                 />
                 <button
                   onClick={handleFollowUp}
-                  disabled={!followUpPrompt.trim() || loading || tokensUsed >= TOKEN_LIMIT}
+                  disabled={!followUpPrompt.trim() || loading || isTokenLimitReached}
                   className="bg-blue-500 text-white px-4 py-2 rounded-lg hover:bg-blue-400 disabled:opacity-50 disabled:cursor-not-allowed transition-colors focus:ring-2 focus:ring-blue-300 w-16 flex-shrink-0"
                 >
                   Send
@@ -785,8 +842,15 @@ export default function Demo() {
                 {!simulationData && !loading && !error && (
                   <div className="text-gray-400 text-center p-8">
                     <MessageSquare className="w-12 h-12 mx-auto mb-4 opacity-50" />
-                    <p className="text-lg">Enter a prompt and click "Run Simulation\" to get started</p>
-                    <p className="text-sm mt-2">You have {remainingTokens.toLocaleString()} tokens remaining</p>
+                    <p className="text-lg">
+                      {isTokenLimitReached 
+                        ? "Token limit reached - contact support for more access"
+                        : "Enter a prompt and click \"Run Simulation\" to get started"
+                      }
+                    </p>
+                    {!isTokenLimitReached && (
+                      <p className="text-sm mt-2">You have {remainingTokens.toLocaleString()} tokens remaining</p>
+                    )}
                   </div>
                 )}
                 
@@ -831,7 +895,12 @@ export default function Demo() {
                     <Code className="w-12 h-12 opacity-70" />
                   </div>
                   <h3 className="text-lg font-semibold mb-2 text-gray-300">Ready to Explain</h3>
-                  <p className="text-gray-400">Run a simulation to see detailed explanations and insights</p>
+                  <p className="text-gray-400">
+                    {isTokenLimitReached 
+                      ? "Token limit reached - upgrade for more simulations"
+                      : "Run a simulation to see detailed explanations and insights"
+                    }
+                  </p>
                 </div>
               ) : (
                 <div className="space-y-4">
