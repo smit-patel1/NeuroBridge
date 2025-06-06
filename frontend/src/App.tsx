@@ -14,10 +14,10 @@ function AppContent() {
   useEffect(() => {
     const checkAuthAndRedirect = async () => {
       try {
-        const { data: { session } } = await supabase.auth.getSession();
-        
+        const { data: { user } } = await supabase.auth.getUser();
+
         // If user is authenticated and on root path, redirect to demo
-        if (session && window.location.pathname === '/') {
+        if (user && window.location.pathname === '/') {
           navigate('/demo');
         }
       } catch (error) {
