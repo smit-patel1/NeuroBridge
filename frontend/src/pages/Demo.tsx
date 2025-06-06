@@ -131,6 +131,7 @@ export default function Demo() {
       } else {
         // Update local token count
         setTokensUsed(prev => prev + tokens);
+        console.log(`✓ Logged ${tokens} tokens for user ${user.id}`);
       }
     } catch (error) {
       console.error('Error inserting token usage:', error);
@@ -293,18 +294,23 @@ export default function Demo() {
         jsCode: data.jsCode
       });
 
-      // Calculate and log token usage
-      let tokensUsedInRequest = 0;
-      if (data.usage && data.usage.total_tokens) {
-        tokensUsedInRequest = data.usage.total_tokens;
-      } else {
-        // Estimate token usage if not provided
+      // Extract token usage from Perplexity API response
+      const tokensUsedInRequest = data.usage?.total_tokens || 0;
+      
+      // If no usage data from API, estimate token usage
+      let finalTokensUsed = tokensUsedInRequest;
+      if (finalTokensUsed === 0) {
         const completion = data.canvasHtml + data.jsCode;
-        tokensUsedInRequest = estimateTokenUsage(prompt, completion);
+        finalTokensUsed = estimateTokenUsage(prompt, completion);
+        console.log(`⚠️ No usage data from API, estimated ${finalTokensUsed} tokens`);
+      } else {
+        console.log(`✓ API reported ${finalTokensUsed} tokens used`);
       }
 
-      // Log the token usage
-      await logTokenUsage(tokensUsedInRequest, prompt);
+      // Log the token usage to Supabase
+      if (finalTokensUsed > 0) {
+        await logTokenUsage(finalTokensUsed, prompt);
+      }
 
     } catch (err) {
       console.error('Simulation request error:', err);
@@ -316,8 +322,73 @@ export default function Demo() {
 
   const handleFollowUp = async () => {
     if (!followUpPrompt.trim()) return;
-    console.log('Follow-up:', followUpPrompt);
-    setFollowUpPrompt('');
+    
+    // Check token limit for follow-up requests
+    if (tokensUsed >= TOKEN_LIMIT) {
+      setError(`You've reached your free token limit (${TOKEN_LIMIT.toLocaleString()} tokens). Please contact support for more access.`);
+      return;
+    }
+
+    setLoading(true);
+    setError('');
+
+    try {
+      // Make follow-up request to the simulation API
+      const response = await fetch("https://zurfhydnztcxlomdyqds.functions.supabase.co/simulate", {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ 
+          prompt: followUpPrompt, 
+          subject,
+          followUp: true,
+          previousSimulation: simulationData 
+        }),
+      });
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        throw new Error(`Server error: ${response.status} - ${errorText}`);
+      }
+
+      const data = await response.json();
+
+      if (data.error) {
+        setError(data.error);
+        return;
+      }
+
+      // Update simulation if new data is provided
+      if (data.canvasHtml && data.jsCode) {
+        setSimulationData({
+          canvasHtml: data.canvasHtml,
+          jsCode: data.jsCode
+        });
+      }
+
+      // Log token usage for follow-up request
+      const tokensUsedInRequest = data.usage?.total_tokens || 0;
+      let finalTokensUsed = tokensUsedInRequest;
+      
+      if (finalTokensUsed === 0) {
+        // Estimate tokens for follow-up (typically smaller)
+        finalTokensUsed = estimateTokenUsage(followUpPrompt, data.response || '');
+      }
+
+      if (finalTokensUsed > 0) {
+        await logTokenUsage(finalTokensUsed, `Follow-up: ${followUpPrompt}`);
+      }
+
+      setFollowUpPrompt('');
+      console.log('✓ Follow-up request completed');
+
+    } catch (err) {
+      console.error('Follow-up request error:', err);
+      setError((err as Error).message || 'Failed to process follow-up request');
+    } finally {
+      setLoading(false);
+    }
   };
 
   const selectFollowUpOption = (question: string) => {
@@ -577,7 +648,7 @@ export default function Demo() {
                 />
                 <button
                   onClick={handleFollowUp}
-                  disabled={!followUpPrompt.trim()}
+                  disabled={!followUpPrompt.trim() || loading || tokensUsed >= TOKEN_LIMIT}
                   className="bg-blue-500 text-white px-3 py-2 rounded-lg hover:bg-blue-400 disabled:opacity-50 disabled:cursor-not-allowed transition-colors focus:ring-2 focus:ring-blue-300 w-16 flex-shrink-0"
                 >
                   Send
