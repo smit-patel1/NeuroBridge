@@ -1,6 +1,6 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Loader2, AlertCircle, ChevronDown, Code, MessageSquare, Lightbulb, RefreshCw, MoreHorizontal } from 'lucide-react';
+import { Loader2, AlertCircle, ChevronDown, Code, MessageSquare, Lightbulb, RefreshCw, MoreHorizontal, Zap } from 'lucide-react';
 import { supabase } from '@/lib/supabaseClient';
 
 const subjects = ['Mathematics', 'Physics', 'Computer Science'];
@@ -11,6 +11,8 @@ const commonQuestions = [
   'Make it more complex',
   'Slow down the animation'
 ];
+
+const TOKEN_LIMIT = 2000; // Free tier limit
 
 export default function Demo() {
   const navigate = useNavigate();
@@ -25,6 +27,9 @@ export default function Demo() {
   const [showTechnicalDetails, setShowTechnicalDetails] = useState(false);
   const [showFollowUpOptions, setShowFollowUpOptions] = useState(false);
   const [authLoading, setAuthLoading] = useState(true);
+  const [user, setUser] = useState<any>(null);
+  const [tokensUsed, setTokensUsed] = useState(0);
+  const [tokensLoading, setTokensLoading] = useState(true);
   const followUpRef = useRef<HTMLDivElement>(null);
   const iframeRef = useRef<HTMLIFrameElement>(null);
 
@@ -37,6 +42,7 @@ export default function Demo() {
           navigate('/auth');
           return;
         }
+        setUser(session.user);
         setAuthLoading(false);
       } catch (error) {
         console.error('Auth check error:', error);
@@ -50,11 +56,76 @@ export default function Demo() {
     const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
       if (event === 'SIGNED_OUT' || !session) {
         navigate('/auth');
+      } else if (session) {
+        setUser(session.user);
       }
     });
 
     return () => subscription.unsubscribe();
   }, [navigate]);
+
+  // Load token usage when user is available
+  useEffect(() => {
+    if (user) {
+      loadTokenUsage();
+    }
+  }, [user]);
+
+  const loadTokenUsage = async () => {
+    if (!user) return;
+    
+    setTokensLoading(true);
+    try {
+      const { data, error } = await supabase
+        .from('token_usage')
+        .select('tokens_used')
+        .eq('user_id', user.id);
+
+      if (error) {
+        console.error('Error loading token usage:', error);
+        return;
+      }
+
+      const totalTokensUsed = data?.reduce((sum, row) => sum + row.tokens_used, 0) || 0;
+      setTokensUsed(totalTokensUsed);
+    } catch (error) {
+      console.error('Error calculating token usage:', error);
+    } finally {
+      setTokensLoading(false);
+    }
+  };
+
+  const estimateTokenUsage = (prompt: string, completion: string): number => {
+    // Rough estimation: ~4 characters per token
+    const promptTokens = Math.ceil(prompt.length / 4);
+    const completionTokens = Math.ceil(completion.length / 4);
+    return promptTokens + completionTokens;
+  };
+
+  const logTokenUsage = async (tokens: number, promptText: string) => {
+    if (!user) return;
+
+    try {
+      const { error } = await supabase
+        .from('token_usage')
+        .insert([
+          {
+            user_id: user.id,
+            tokens_used: tokens,
+            prompt: promptText,
+          }
+        ]);
+
+      if (error) {
+        console.error('Error logging token usage:', error);
+      } else {
+        // Update local token count
+        setTokensUsed(prev => prev + tokens);
+      }
+    } catch (error) {
+      console.error('Error inserting token usage:', error);
+    }
+  };
 
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
@@ -152,6 +223,17 @@ export default function Demo() {
   }, [simulationData]);
 
   const runSimulation = async () => {
+    if (!user) {
+      setError('Please log in to use the simulation');
+      return;
+    }
+
+    // Check token limit before making request
+    if (tokensUsed >= TOKEN_LIMIT) {
+      setError(`You've reached your free token limit (${TOKEN_LIMIT.toLocaleString()} tokens). Please contact support for more access.`);
+      return;
+    }
+
     setLoading(true);
     setError('');
     setSuggestion('');
@@ -201,6 +283,19 @@ export default function Demo() {
         jsCode: data.jsCode
       });
 
+      // Calculate and log token usage
+      let tokensUsedInRequest = 0;
+      if (data.usage && data.usage.total_tokens) {
+        tokensUsedInRequest = data.usage.total_tokens;
+      } else {
+        // Estimate token usage if not provided
+        const completion = data.canvasHtml + data.jsCode;
+        tokensUsedInRequest = estimateTokenUsage(prompt, completion);
+      }
+
+      // Log the token usage
+      await logTokenUsage(tokensUsedInRequest, prompt);
+
     } catch (err) {
       console.error('Simulation request error:', err);
       setError((err as Error).message || 'Failed to generate simulation');
@@ -220,6 +315,9 @@ export default function Demo() {
     setShowFollowUpOptions(false);
   };
 
+  const remainingTokens = TOKEN_LIMIT - tokensUsed;
+  const usagePercentage = (tokensUsed / TOKEN_LIMIT) * 100;
+
   // Show loading screen while checking authentication
   if (authLoading) {
     return (
@@ -237,6 +335,44 @@ export default function Demo() {
       <div className="flex h-[calc(100vh-4rem)]">
         {/* Left Sidebar - Fixed 300px width */}
         <div className="w-[300px] bg-gray-800 rounded-lg m-6 mr-3 p-6 flex flex-col overflow-hidden">
+          {/* Token Usage Display */}
+          <div className="mb-6 p-4 bg-gray-700 rounded-lg">
+            <div className="flex items-center justify-between mb-2">
+              <h3 className="text-sm font-semibold text-white flex items-center">
+                <Zap className="w-4 h-4 mr-2" />
+                Token Usage
+              </h3>
+              {tokensLoading && <Loader2 className="w-4 h-4 animate-spin text-gray-400" />}
+            </div>
+            
+            <div className="space-y-2">
+              <div className="flex justify-between text-sm">
+                <span className="text-gray-300">Used:</span>
+                <span className="text-white font-medium">{tokensUsed.toLocaleString()}</span>
+              </div>
+              <div className="flex justify-between text-sm">
+                <span className="text-gray-300">Remaining:</span>
+                <span className={`font-medium ${remainingTokens < 100 ? 'text-red-400' : 'text-green-400'}`}>
+                  {remainingTokens.toLocaleString()}
+                </span>
+              </div>
+              
+              {/* Progress Bar */}
+              <div className="w-full bg-gray-600 rounded-full h-2 mt-3">
+                <div 
+                  className={`h-2 rounded-full transition-all duration-300 ${
+                    usagePercentage >= 90 ? 'bg-red-500' : 
+                    usagePercentage >= 70 ? 'bg-yellow-500' : 'bg-green-500'
+                  }`}
+                  style={{ width: `${Math.min(usagePercentage, 100)}%` }}
+                />
+              </div>
+              <div className="text-xs text-gray-400 text-center">
+                {usagePercentage.toFixed(1)}% of {TOKEN_LIMIT.toLocaleString()} tokens
+              </div>
+            </div>
+          </div>
+
           <div className="mb-4">
             <label className="block text-sm font-medium text-gray-300 mb-2">Subject</label>
             <div className="relative">
@@ -265,11 +401,11 @@ export default function Demo() {
 
           <button
             onClick={runSimulation}
-            disabled={loading || !prompt.trim()}
+            disabled={loading || !prompt.trim() || tokensUsed >= TOKEN_LIMIT}
             className="bg-yellow-500 text-black py-3 px-4 rounded-lg font-semibold hover:bg-yellow-400 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center mb-6 transition-colors"
           >
             {loading ? <Loader2 className="w-5 h-5 animate-spin mr-2" /> : null}
-            Run Simulation
+            {tokensUsed >= TOKEN_LIMIT ? 'Token Limit Reached' : 'Run Simulation'}
           </button>
 
           {/* Follow Up Section */}
@@ -356,7 +492,8 @@ export default function Demo() {
                   {!simulationData && !loading && !error && (
                     <div className="text-gray-400 text-center p-8">
                       <MessageSquare className="w-12 h-12 mx-auto mb-4 opacity-50" />
-                      <p className="text-lg">Enter a prompt and click "Run Simulation\" to get started</p>
+                      <p className="text-lg">Enter a prompt and click "Run Simulation" to get started</p>
+                      <p className="text-sm mt-2">You have {remainingTokens.toLocaleString()} tokens remaining</p>
                     </div>
                   )}
                   
