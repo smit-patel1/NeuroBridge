@@ -1,5 +1,5 @@
 import React, { useEffect } from 'react';
-import { BrowserRouter as Router, Routes, Route, useNavigate } from 'react-router-dom';
+import { BrowserRouter as Router, Routes, Route, useNavigate, useLocation } from 'react-router-dom';
 import { supabase } from './lib/supabaseClient';
 import Navbar from './components/Navbar';
 import Home from './pages/Home';
@@ -9,6 +9,7 @@ import Auth from './pages/Auth';
 
 function AppContent() {
   const navigate = useNavigate();
+  const location = useLocation();
 
   useEffect(() => {
     const checkAuthAndRedirect = async () => {
@@ -27,9 +28,12 @@ function AppContent() {
     checkAuthAndRedirect();
   }, [navigate]);
 
+  // Hide global navbar on demo page
+  const showNavbar = location.pathname !== '/demo';
+
   return (
     <div className="min-h-screen">
-      <Navbar />
+      {showNavbar && <Navbar />}
       <Routes>
         <Route path="/" element={<Home />} />
         <Route path="/demo" element={<Demo />} />

@@ -1,6 +1,6 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Loader2, AlertCircle, ChevronDown, Code, MessageSquare, Lightbulb, RefreshCw, MoreHorizontal, Zap, Menu, X, Settings, Clock } from 'lucide-react';
+import { Loader2, AlertCircle, ChevronDown, Code, MessageSquare, Lightbulb, RefreshCw, MoreHorizontal, Zap, Menu, X, Settings, Clock, LogOut, User, Plus, Sparkles } from 'lucide-react';
 import { supabase } from '@/lib/supabaseClient';
 
 const subjects = ['Mathematics', 'Physics', 'Computer Science'];
@@ -401,6 +401,28 @@ export default function Demo() {
     setSidebarOpen(false);
   };
 
+  const handleNewChat = () => {
+    // Clear all simulation state
+    setPrompt('');
+    setSimulationData(null);
+    setError('');
+    setSuggestion('');
+    setRawResponse('');
+    setFollowUpPrompt('');
+    setShowTechnicalDetails(false);
+    setShowFollowUpOptions(false);
+    
+    // Reset subject to default
+    setSubject(subjects[0]);
+    
+    console.log('✓ New chat started - interface reset');
+  };
+
+  const handleSignOut = async () => {
+    await supabase.auth.signOut();
+    navigate('/');
+  };
+
   const remainingTokens = TOKEN_LIMIT - tokensUsed;
   const usagePercentage = (tokensUsed / TOKEN_LIMIT) * 100;
 
@@ -417,15 +439,48 @@ export default function Demo() {
   }
 
   return (
-    <div className="min-h-screen bg-gray-900 pt-16 relative">
-      {/* Hamburger Menu Button */}
-      <button
-        onClick={() => setSidebarOpen(!sidebarOpen)}
-        className="fixed top-20 left-4 z-50 bg-gray-800 hover:bg-gray-700 text-white p-3 rounded-lg shadow-lg transition-colors lg:p-2"
-        aria-label="Toggle sidebar"
-      >
-        <Menu className="w-6 h-6 lg:w-5 lg:h-5" />
-      </button>
+    <div className="min-h-screen bg-gray-900">
+      {/* Custom Demo Navbar */}
+      <nav className="fixed w-full bg-gray-900/95 backdrop-blur-sm z-50 border-b border-gray-700">
+        <div className="container mx-auto px-4 py-4">
+          <div className="flex items-center justify-between">
+            {/* Left Side - Hamburger Menu */}
+            <button
+              onClick={() => setSidebarOpen(!sidebarOpen)}
+              className="bg-gray-800 hover:bg-gray-700 text-white p-2 rounded-lg shadow-lg transition-colors"
+              aria-label="Toggle sidebar"
+            >
+              <Menu className="w-5 h-5" />
+            </button>
+
+            {/* Center - New Chat Button */}
+            <button
+              onClick={handleNewChat}
+              className="bg-yellow-500 hover:bg-yellow-400 text-black px-6 py-2 rounded-lg font-semibold transition-colors flex items-center space-x-2 shadow-lg"
+            >
+              <Sparkles className="w-4 h-4" />
+              <span>New Simulation</span>
+            </button>
+
+            {/* Right Side - User Info */}
+            {user && (
+              <div className="flex items-center space-x-3">
+                <div className="flex items-center space-x-2 text-gray-300">
+                  <User className="w-4 h-4" />
+                  <span className="text-sm hidden sm:inline">{user.email}</span>
+                </div>
+                <button 
+                  onClick={handleSignOut}
+                  className="bg-red-500 text-white px-4 py-2 rounded-lg hover:bg-red-400 transition-colors flex items-center space-x-2"
+                >
+                  <LogOut className="w-4 h-4" />
+                  <span className="hidden sm:inline">Sign Out</span>
+                </button>
+              </div>
+            )}
+          </div>
+        </div>
+      </nav>
 
       {/* Sidebar Backdrop */}
       {sidebarOpen && (
@@ -441,7 +496,7 @@ export default function Demo() {
       } lg:w-72`}>
         <div className="flex flex-col h-full">
           {/* Sidebar Header */}
-          <div className="flex items-center justify-between p-4 border-b border-gray-700">
+          <div className="flex items-center justify-between p-4 border-b border-gray-700 mt-16">
             <h2 className="text-xl font-bold text-white">Sidebar</h2>
             <button
               onClick={() => setSidebarOpen(false)}
@@ -531,8 +586,8 @@ export default function Demo() {
       </div>
 
       {/* Main Content */}
-      <div className={`transition-all duration-300 ease-in-out ${sidebarOpen ? 'lg:ml-72' : 'ml-0'}`}>
-        <div className="flex flex-col lg:flex-row h-[calc(100vh-4rem)] gap-4 p-4 lg:gap-6 lg:p-6">
+      <div className={`transition-all duration-300 ease-in-out pt-20 ${sidebarOpen ? 'lg:ml-72' : 'ml-0'}`}>
+        <div className="flex flex-col lg:flex-row h-[calc(100vh-5rem)] gap-4 p-4 lg:gap-6 lg:p-6">
           {/* Left Panel - Controls */}
           <div className="w-full lg:w-80 bg-gray-800 rounded-lg p-4 lg:p-6 flex flex-col order-1 lg:order-1">
             {/* Token Usage Display - Mobile Only */}
@@ -649,7 +704,7 @@ export default function Demo() {
                 <button
                   onClick={handleFollowUp}
                   disabled={!followUpPrompt.trim() || loading || tokensUsed >= TOKEN_LIMIT}
-                  className="bg-blue-500 text-white px-3 py-2 rounded-lg hover:bg-blue-400 disabled:opacity-50 disabled:cursor-not-allowed transition-colors focus:ring-2 focus:ring-blue-300 w-16 flex-shrink-0"
+                  className="bg-blue-500 text-white px-4 py-2 rounded-lg hover:bg-blue-400 disabled:opacity-50 disabled:cursor-not-allowed transition-colors focus:ring-2 focus:ring-blue-300 w-16 flex-shrink-0"
                 >
                   Send
                 </button>
