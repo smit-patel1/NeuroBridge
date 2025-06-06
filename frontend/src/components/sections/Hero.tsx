@@ -65,7 +65,7 @@ export default function Hero() {
           ) : (
             <Link to={user ? "/demo" : "/auth"}>
               <button className="bg-yellow-500 text-black hover:bg-yellow-400 px-8 py-6 rounded-2xl text-lg font-semibold shadow-lg flex items-center">
-                {user ? "Enter Demo" : "Create Account to Try Demo"} <Sparkles className="ml-2 w-5 h-5" />
+                {user ? "Enter Demo" : "Try Demo"} <Sparkles className="ml-2 w-5 h-5" />
               </button>
             </Link>
           )}
