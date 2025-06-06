@@ -47,12 +47,19 @@ export default function Demo() {
   useEffect(() => {
     const checkAuth = async () => {
       try {
-        const { data: { session } } = await supabase.auth.getSession();
-        if (!session) {
+        const { data: { user }, error } = await supabase.auth.getUser();
+        if (error) {
+          console.error('Auth error:', error);
           navigate('/auth');
           return;
         }
-        setUser(session.user);
+        
+        if (!user) {
+          navigate('/auth');
+          return;
+        }
+        
+        setUser(user);
         setAuthLoading(false);
       } catch (error) {
         console.error('Auth check error:', error);
@@ -63,11 +70,15 @@ export default function Demo() {
     checkAuth();
 
     // Listen for auth state changes
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
       if (event === 'SIGNED_OUT' || !session) {
         navigate('/auth');
       } else if (session) {
-        setUser(session.user);
+        // Use getUser() to get the most current user data
+        const { data: { user }, error } = await supabase.auth.getUser();
+        if (user && !error) {
+          setUser(user);
+        }
       }
     });
 
@@ -82,7 +93,10 @@ export default function Demo() {
   }, [user]);
 
   const loadTokenUsage = async () => {
-    if (!user) return;
+    if (!user?.id) {
+      console.error('No user ID available for token usage loading');
+      return;
+    }
     
     setTokensLoading(true);
     try {
@@ -98,6 +112,7 @@ export default function Demo() {
 
       const totalTokensUsed = data?.reduce((sum, row) => sum + row.tokens_used, 0) || 0;
       setTokensUsed(totalTokensUsed);
+      console.log(`✓ Loaded token usage: ${totalTokensUsed} tokens for user ${user.id}`);
     } catch (error) {
       console.error('Error calculating token usage:', error);
     } finally {
@@ -113,9 +128,20 @@ export default function Demo() {
   };
 
   const logTokenUsage = async (tokens: number, promptText: string) => {
-    if (!user) return;
-
     try {
+      // Get the most current user data
+      const { data: { user }, error: userError } = await supabase.auth.getUser();
+      
+      if (userError) {
+        console.error('Error getting user for token logging:', userError);
+        return;
+      }
+      
+      if (!user?.id) {
+        console.error('No user ID available for token logging');
+        return;
+      }
+
       const { error } = await supabase
         .from('token_usage')
         .insert([
@@ -127,12 +153,14 @@ export default function Demo() {
         ]);
 
       if (error) {
-        console.error('Error logging token usage:', error);
-      } else {
-        // Update local token count
-        setTokensUsed(prev => prev + tokens);
-        console.log(`✓ Logged ${tokens} tokens for user ${user.id}`);
+        console.error('Token usage insert failed:', error.message);
+        return;
       }
+
+      // Update local token count only after successful insert
+      setTokensUsed(prev => prev + tokens);
+      console.log(`✓ Successfully logged ${tokens} tokens for user ${user.id}`);
+      
     } catch (error) {
       console.error('Error inserting token usage:', error);
     }
@@ -234,8 +262,12 @@ export default function Demo() {
   }, [simulationData]);
 
   const runSimulation = async () => {
-    if (!user) {
-      setError('Please log in to use the simulation');
+    // Verify user authentication before proceeding
+    const { data: { user }, error: userError } = await supabase.auth.getUser();
+    
+    if (userError || !user?.id) {
+      setError('Authentication required. Please log in to use the simulation.');
+      navigate('/auth');
       return;
     }
 
@@ -322,6 +354,15 @@ export default function Demo() {
 
   const handleFollowUp = async () => {
     if (!followUpPrompt.trim()) return;
+    
+    // Verify user authentication before proceeding
+    const { data: { user }, error: userError } = await supabase.auth.getUser();
+    
+    if (userError || !user?.id) {
+      setError('Authentication required. Please log in to continue.');
+      navigate('/auth');
+      return;
+    }
     
     // Check token limit for follow-up requests
     if (tokensUsed >= TOKEN_LIMIT) {
