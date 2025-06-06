@@ -24,7 +24,7 @@ export default function Auth() {
   useEffect(() => {
     supabase.auth.onAuthStateChange((event, session) => {
       if (event === 'SIGNED_IN' && session) {
-        navigate('/');
+        navigate('/demo');
       }
     });
   }, [navigate]);
@@ -74,7 +74,7 @@ export default function Auth() {
         if (signInError) throw signInError;
 
         if (data.session) {
-          navigate('/');
+          navigate('/demo');
         }
       } else {
         const { data, error: signUpError } = await supabase.auth.signUp({
