@@ -49,20 +49,22 @@ export default function Demo() {
       try {
         const { data: { user }, error } = await supabase.auth.getUser();
         if (error) {
-          console.error('Auth error:', error);
+          console.error('❌ Demo: Auth error:', error);
           navigate('/auth');
           return;
         }
         
         if (!user) {
+          console.log('❌ Demo: No user found, redirecting to auth');
           navigate('/auth');
           return;
         }
         
+        console.log('✓ Demo: User authenticated:', user.email);
         setUser(user);
         setAuthLoading(false);
       } catch (error) {
-        console.error('Auth check error:', error);
+        console.error('❌ Demo: Auth check error:', error);
         navigate('/auth');
       }
     };
@@ -71,12 +73,16 @@ export default function Demo() {
 
     // Listen for auth state changes
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
+      console.log('✓ Demo: Auth state changed:', event);
+      
       if (event === 'SIGNED_OUT' || !session) {
+        console.log('✓ Demo: User signed out, redirecting to auth');
         navigate('/auth');
       } else if (session) {
         // Use getUser() to get the most current user data
         const { data: { user }, error } = await supabase.auth.getUser();
         if (user && !error) {
+          console.log('✓ Demo: User session updated:', user.email);
           setUser(user);
         }
       }
@@ -94,7 +100,7 @@ export default function Demo() {
 
   const loadTokenUsage = async () => {
     if (!user?.id) {
-      console.error('No user ID available for token usage loading');
+      console.error('❌ Demo: No user ID available for token usage loading');
       return;
     }
     
@@ -107,15 +113,15 @@ export default function Demo() {
         .single();
 
       if (error) {
-        console.error('Error loading token usage:', error);
+        console.error('❌ Demo: Error loading token usage:', error);
         return;
       }
 
       const totalTokensUsed = data?.sum || 0;
       setTokensUsed(totalTokensUsed);
-      console.log(`✓ Loaded token usage: ${totalTokensUsed} tokens for user ${user.id}`);
+      console.log(`✓ Demo: Loaded token usage: ${totalTokensUsed} tokens for user ${user.id}`);
     } catch (error) {
-      console.error('Error calculating token usage:', error);
+      console.error('❌ Demo: Error calculating token usage:', error);
     } finally {
       setTokensLoading(false);
     }
@@ -134,12 +140,12 @@ export default function Demo() {
       const { data: { user }, error: userError } = await supabase.auth.getUser();
       
       if (userError) {
-        console.error('Error getting user for token logging:', userError);
+        console.error('❌ Demo: Error getting user for token logging:', userError);
         return;
       }
       
       if (!user?.id) {
-        console.error('No user ID available for token logging');
+        console.error('❌ Demo: No user ID available for token logging');
         return;
       }
 
@@ -154,19 +160,19 @@ export default function Demo() {
         ]);
 
       if (error) {
-        console.error('Token usage insert failed:', error.message);
+        console.error('❌ Demo: Token usage insert failed:', error.message);
         return;
       }
 
       // Update local token count only after successful insert
       setTokensUsed(prev => prev + tokens);
-      console.log(`✓ Successfully logged ${tokens} tokens for user ${user.id}`);
+      console.log(`✓ Demo: Successfully logged ${tokens} tokens for user ${user.id}`);
       
       // Refresh token usage from database to ensure accuracy
       await loadTokenUsage();
       
     } catch (error) {
-      console.error('Error inserting token usage:', error);
+      console.error('❌ Demo: Error inserting token usage:', error);
     }
   };
 
@@ -250,47 +256,58 @@ export default function Demo() {
         iframe.srcdoc = doc;
         
         iframe.onload = () => {
-          console.log('✓ Simulation loaded successfully in iframe');
+          console.log('✓ Demo: Simulation loaded successfully in iframe');
         };
         
         iframe.onerror = (error) => {
-          console.error('Iframe loading error:', error);
+          console.error('❌ Demo: Iframe loading error:', error);
           setError('Failed to load simulation');
         };
         
       } catch (error) {
-        console.error('Simulation creation error:', error);
+        console.error('❌ Demo: Simulation creation error:', error);
         setError(`Simulation creation failed: ${(error as Error).message}`);
       }
     }
   }, [simulationData]);
 
   const runSimulation = async () => {
+    console.log('🔄 Demo: Starting simulation run...');
+    
     // Verify user authentication before proceeding
     const { data: { user }, error: userError } = await supabase.auth.getUser();
     
     if (userError || !user?.id) {
+      console.error('❌ Demo: Authentication required for simulation');
       setError('Authentication required. Please log in to use the simulation.');
       navigate('/auth');
       return;
     }
+
+    console.log('✓ Demo: User authenticated, checking token usage...');
 
     // Refresh token usage before checking limit
     await loadTokenUsage();
 
     // Check token limit before making request
     if (tokensUsed >= TOKEN_LIMIT) {
+      console.log('❌ Demo: Token limit reached');
       setError(`You've reached your free token limit (${TOKEN_LIMIT.toLocaleString()} tokens). Please contact support for more access.`);
       return;
     }
 
+    console.log(`✓ Demo: Token check passed (${tokensUsed}/${TOKEN_LIMIT}), running simulation...`);
+
+    // Reset all simulation state before starting
     setLoading(true);
     setError('');
     setSuggestion('');
     setRawResponse('');
-    setSimulationData(null);
+    // Note: We don't clear simulationData here to allow running same prompt multiple times
 
     try {
+      console.log('🔄 Demo: Sending request to simulation API...');
+      
       const response = await fetch("https://zurfhydnztcxlomdyqds.functions.supabase.co/simulate", {
         method: 'POST',
         headers: {
@@ -314,6 +331,7 @@ export default function Demo() {
       setRawResponse(JSON.stringify(data, null, 2));
 
       if (data.suggestion) {
+        console.log('✓ Demo: Received suggestion from API');
         setSuggestion(data.suggestion);
         // Refresh token usage even for suggestions
         await loadTokenUsage();
@@ -321,6 +339,7 @@ export default function Demo() {
       }
 
       if (data.error) {
+        console.error('❌ Demo: API returned error:', data.error);
         setError(data.error);
         // Refresh token usage even for errors
         await loadTokenUsage();
@@ -331,7 +350,7 @@ export default function Demo() {
         throw new Error('Incomplete simulation data received from server');
       }
 
-      console.log('✓ Valid simulation data received');
+      console.log('✓ Demo: Valid simulation data received, updating UI...');
       setSimulationData({
         canvasHtml: data.canvasHtml,
         jsCode: data.jsCode
@@ -345,9 +364,9 @@ export default function Demo() {
       if (finalTokensUsed === 0) {
         const completion = data.canvasHtml + data.jsCode;
         finalTokensUsed = estimateTokenUsage(prompt, completion);
-        console.log(`⚠️ No usage data from API, estimated ${finalTokensUsed} tokens`);
+        console.log(`⚠️ Demo: No usage data from API, estimated ${finalTokensUsed} tokens`);
       } else {
-        console.log(`✓ API reported ${finalTokensUsed} tokens used`);
+        console.log(`✓ Demo: API reported ${finalTokensUsed} tokens used`);
       }
 
       // Log the token usage to Supabase
@@ -355,23 +374,29 @@ export default function Demo() {
         await logTokenUsage(finalTokensUsed, prompt);
       }
 
+      console.log('✓ Demo: Simulation completed successfully');
+
     } catch (err) {
-      console.error('Simulation request error:', err);
+      console.error('❌ Demo: Simulation request error:', err);
       setError((err as Error).message || 'Failed to generate simulation');
       // Refresh token usage even after errors
       await loadTokenUsage();
     } finally {
       setLoading(false);
+      console.log('✓ Demo: Simulation request finished (loading state cleared)');
     }
   };
 
   const handleFollowUp = async () => {
     if (!followUpPrompt.trim()) return;
     
+    console.log('🔄 Demo: Starting follow-up request...');
+    
     // Verify user authentication before proceeding
     const { data: { user }, error: userError } = await supabase.auth.getUser();
     
     if (userError || !user?.id) {
+      console.error('❌ Demo: Authentication required for follow-up');
       setError('Authentication required. Please log in to continue.');
       navigate('/auth');
       return;
@@ -382,9 +407,12 @@ export default function Demo() {
     
     // Check token limit for follow-up requests
     if (tokensUsed >= TOKEN_LIMIT) {
+      console.log('❌ Demo: Token limit reached for follow-up');
       setError(`You've reached your free token limit (${TOKEN_LIMIT.toLocaleString()} tokens). Please contact support for more access.`);
       return;
     }
+
+    console.log('✓ Demo: Follow-up token check passed, processing request...');
 
     setLoading(true);
     setError('');
@@ -412,6 +440,7 @@ export default function Demo() {
       const data = await response.json();
 
       if (data.error) {
+        console.error('❌ Demo: Follow-up API error:', data.error);
         setError(data.error);
         // Refresh token usage even for errors
         await loadTokenUsage();
@@ -420,6 +449,7 @@ export default function Demo() {
 
       // Update simulation if new data is provided
       if (data.canvasHtml && data.jsCode) {
+        console.log('✓ Demo: Follow-up returned new simulation data');
         setSimulationData({
           canvasHtml: data.canvasHtml,
           jsCode: data.jsCode
@@ -440,15 +470,16 @@ export default function Demo() {
       }
 
       setFollowUpPrompt('');
-      console.log('✓ Follow-up request completed');
+      console.log('✓ Demo: Follow-up request completed successfully');
 
     } catch (err) {
-      console.error('Follow-up request error:', err);
+      console.error('❌ Demo: Follow-up request error:', err);
       setError((err as Error).message || 'Failed to process follow-up request');
       // Refresh token usage even after errors
       await loadTokenUsage();
     } finally {
       setLoading(false);
+      console.log('✓ Demo: Follow-up request finished (loading state cleared)');
     }
   };
 
@@ -463,6 +494,8 @@ export default function Demo() {
   };
 
   const handleNewChat = () => {
+    console.log('🔄 Demo: Starting new chat - clearing all state...');
+    
     // Clear all simulation state
     setPrompt('');
     setSimulationData(null);
@@ -472,14 +505,16 @@ export default function Demo() {
     setFollowUpPrompt('');
     setShowTechnicalDetails(false);
     setShowFollowUpOptions(false);
+    setLoading(false); // Ensure loading is cleared
     
     // Reset subject to default
     setSubject(subjects[0]);
     
-    console.log('✓ New chat started - interface reset');
+    console.log('✓ Demo: New chat started - interface reset');
   };
 
   const handleSignOut = async () => {
+    console.log('🔄 Demo: User signing out...');
     await supabase.auth.signOut();
     navigate('/');
   };

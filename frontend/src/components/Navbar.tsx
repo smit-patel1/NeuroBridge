@@ -11,30 +11,75 @@ export default function Navbar() {
   useEffect(() => {
     // Get initial session
     const getSession = async () => {
-      const { data: { session } } = await supabase.auth.getSession();
-      setUser(session?.user || null);
-      setLoading(false);
+      try {
+        const { data: { session } } = await supabase.auth.getSession();
+        setUser(session?.user || null);
+        console.log('✓ Navbar: Initial session loaded', session?.user ? 'User found' : 'No user');
+      } catch (error) {
+        console.error('❌ Navbar: Error getting initial session:', error);
+        setUser(null);
+      } finally {
+        setLoading(false);
+      }
     };
 
     getSession();
 
     // Listen for auth changes
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
+      console.log('✓ Navbar: Auth state changed:', event, session?.user ? 'User present' : 'No user');
       setUser(session?.user || null);
+      
+      // Handle sign out event specifically
+      if (event === 'SIGNED_OUT') {
+        console.log('✓ Navbar: User signed out, clearing state');
+        setUser(null);
+      }
     });
 
-    return () => subscription.unsubscribe();
+    return () => {
+      console.log('✓ Navbar: Cleaning up auth subscription');
+      subscription.unsubscribe();
+    };
   }, []);
 
   const handleSignOut = async () => {
-    await supabase.auth.signOut();
-    navigate('/');
+    try {
+      console.log('🔄 Navbar: Starting sign out process...');
+      
+      // Clear user state immediately for responsive UI
+      setUser(null);
+      
+      // Sign out from Supabase
+      const { error } = await supabase.auth.signOut();
+      
+      if (error) {
+        console.error('❌ Navbar: Sign out error:', error);
+        // Restore user state if sign out failed
+        const { data: { session } } = await supabase.auth.getSession();
+        setUser(session?.user || null);
+        return;
+      }
+      
+      console.log('✓ Navbar: User successfully signed out');
+      
+      // Navigate to home page
+      navigate('/');
+      
+    } catch (error) {
+      console.error('❌ Navbar: Unexpected error during sign out:', error);
+      // Restore user state on unexpected error
+      const { data: { session } } = await supabase.auth.getSession();
+      setUser(session?.user || null);
+    }
   };
 
   const handleDemoClick = () => {
     if (user) {
+      console.log('✓ Navbar: Navigating to demo (user authenticated)');
       navigate('/demo');
     } else {
+      console.log('✓ Navbar: Redirecting to auth (user not authenticated)');
       navigate('/auth');
     }
   };
