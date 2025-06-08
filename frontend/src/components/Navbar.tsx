@@ -9,30 +9,39 @@ export default function Navbar() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    // Get initial session
-    const getSession = async () => {
+    // Get initial user using getUser() instead of getSession() to avoid stale cache
+    const getCurrentUser = async () => {
       try {
-        const { data: { session } } = await supabase.auth.getSession();
-        setUser(session?.user || null);
-        console.log('✓ Navbar: Initial session loaded', session?.user ? 'User found' : 'No user');
+        console.log('🔄 Navbar: Fetching current user...');
+        const { data: { user }, error } = await supabase.auth.getUser();
+        
+        if (error) {
+          console.error('❌ Navbar: Error getting current user:', error);
+          setUser(null);
+        } else {
+          setUser(user);
+          console.log('✓ Navbar: Current user loaded:', user ? `${user.email}` : 'No user');
+        }
       } catch (error) {
-        console.error('❌ Navbar: Error getting initial session:', error);
+        console.error('❌ Navbar: Unexpected error getting user:', error);
         setUser(null);
       } finally {
         setLoading(false);
       }
     };
 
-    getSession();
+    getCurrentUser();
 
     // Listen for auth changes
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
-      console.log('✓ Navbar: Auth state changed:', event, session?.user ? 'User present' : 'No user');
+      console.log('✓ Navbar: Auth state changed:', event, session?.user ? `User: ${session.user.email}` : 'No user');
+      
+      // Always update user state based on session
       setUser(session?.user || null);
       
       // Handle sign out event specifically
       if (event === 'SIGNED_OUT') {
-        console.log('✓ Navbar: User signed out, clearing state');
+        console.log('✓ Navbar: User signed out event received, clearing state');
         setUser(null);
       }
     });
@@ -46,6 +55,7 @@ export default function Navbar() {
   const handleSignOut = async () => {
     try {
       console.log('🔄 Navbar: Starting sign out process...');
+      console.log('🔄 Navbar: Current user before sign out:', user?.email || 'No user');
       
       // Clear user state immediately for responsive UI
       setUser(null);
@@ -54,29 +64,42 @@ export default function Navbar() {
       const { error } = await supabase.auth.signOut();
       
       if (error) {
-        console.error('❌ Navbar: Sign out error:', error);
-        // Restore user state if sign out failed
-        const { data: { session } } = await supabase.auth.getSession();
-        setUser(session?.user || null);
+        console.error('❌ Navbar: Sign out failed:', error.message);
+        
+        // Try to restore user state if sign out failed
+        try {
+          const { data: { user: currentUser } } = await supabase.auth.getUser();
+          setUser(currentUser);
+          console.log('⚠️ Navbar: Restored user state after failed sign out');
+        } catch (restoreError) {
+          console.error('❌ Navbar: Could not restore user state:', restoreError);
+        }
         return;
       }
       
-      console.log('✓ Navbar: User successfully signed out');
+      console.log('✓ Navbar: Supabase sign out successful');
       
-      // Navigate to home page
-      navigate('/');
+      // Use window.location.href for full page reload and complete session clearance
+      console.log('🔄 Navbar: Performing full page reload to clear session...');
+      window.location.href = '/';
       
     } catch (error) {
       console.error('❌ Navbar: Unexpected error during sign out:', error);
-      // Restore user state on unexpected error
-      const { data: { session } } = await supabase.auth.getSession();
-      setUser(session?.user || null);
+      
+      // Try to restore user state on unexpected error
+      try {
+        const { data: { user: currentUser } } = await supabase.auth.getUser();
+        setUser(currentUser);
+        console.log('⚠️ Navbar: Restored user state after unexpected error');
+      } catch (restoreError) {
+        console.error('❌ Navbar: Could not restore user state after error:', restoreError);
+      }
     }
   };
 
   const handleDemoClick = () => {
     if (user) {
-      console.log('✓ Navbar: Navigating to demo (user authenticated)');
+      console.log('✓ Navbar: Navigating to demo (user authenticated):', user.email);
       navigate('/demo');
     } else {
       console.log('✓ Navbar: Redirecting to auth (user not authenticated)');
