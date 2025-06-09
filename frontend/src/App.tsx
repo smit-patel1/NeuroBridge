@@ -1,6 +1,6 @@
 import React, { useEffect } from 'react';
 import { BrowserRouter as Router, Routes, Route, useNavigate, useLocation } from 'react-router-dom';
-import { supabase } from './lib/supabaseClient';
+import { AuthProvider } from './contexts/AuthProvider';
 import Navbar from './components/Navbar';
 import Home from './pages/Home';
 import Demo from './pages/Demo';
@@ -12,20 +12,8 @@ function AppContent() {
   const location = useLocation();
 
   useEffect(() => {
-    const checkAuthAndRedirect = async () => {
-      try {
-        const { data: { session } } = await supabase.auth.getSession();
-        
-        // If user is authenticated and on root path, redirect to demo
-        if (session && window.location.pathname === '/') {
-          navigate('/demo');
-        }
-      } catch (error) {
-        console.error('Error checking authentication:', error);
-      }
-    };
-
-    checkAuthAndRedirect();
+    // Auto-redirect logic can be handled in individual components now
+    // since AuthProvider manages the global auth state
   }, [navigate]);
 
   // Hide global navbar on demo page
@@ -46,9 +34,11 @@ function AppContent() {
 
 function App() {
   return (
-    <Router>
-      <AppContent />
-    </Router>
+    <AuthProvider>
+      <Router>
+        <AppContent />
+      </Router>
+    </AuthProvider>
   );
 }
 
