@@ -8,7 +8,32 @@ const subjects = ['Mathematics', 'Physics', 'Computer Science'];
 
 export default function Demo() {
   const navigate = useNavigate();
-  const { user, session, loading: authLoading, error: authError, withValidSession, signOut } = useAuth();
+  
+  // Wrap useAuth in try-catch to handle context errors gracefully
+  let authData;
+  try {
+    authData = useAuth();
+  } catch (error) {
+    console.error('Demo: Failed to access auth context:', error);
+    return (
+      <div className="min-h-screen bg-gray-900 flex items-center justify-center">
+        <div className="bg-red-500/10 border border-red-500/20 rounded-lg p-6 text-red-200 max-w-md text-center">
+          <AlertCircle className="w-8 h-8 mx-auto mb-4" />
+          <h2 className="text-xl font-bold mb-2">Authentication Error</h2>
+          <p className="mb-4">Failed to access authentication context. Please reload the page.</p>
+          <button 
+            onClick={() => window.location.reload()}
+            className="bg-blue-500 text-white px-4 py-2 rounded hover:bg-blue-400"
+          >
+            Reload Page
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  const { user, session, loading: authLoading, error: authError, withValidSession, signOut } = authData;
+  
   const [prompt, setPrompt] = useState('');
   const [subject, setSubject] = useState(subjects[0]);
   const [loading, setLoading] = useState(false);
@@ -21,7 +46,7 @@ export default function Demo() {
   const [tokenLoading, setTokenLoading] = useState(false);
   const iframeRef = useRef<HTMLIFrameElement>(null);
 
-  // Redirect to auth if not authenticated
+  // Redirect to auth if not authenticated (only after auth loading is complete)
   useEffect(() => {
     if (!authLoading && !user) {
       console.log('Demo: User not authenticated, redirecting to auth');
@@ -142,6 +167,9 @@ export default function Demo() {
   }, [simulationData]);
 
   const runSimulation = async () => {
+    // Reset error state first
+    setError('');
+    
     // Check token limit before proceeding
     if (totalTokensUsed >= 2000) {
       setError('Token limit exceeded (2000 tokens). You have reached your usage limit for this demo.');
@@ -155,7 +183,6 @@ export default function Demo() {
     }
 
     setLoading(true);
-    setError('');
     setSuggestion('');
     setRawResponse('');
     setSimulationData(null);
@@ -352,6 +379,7 @@ export default function Demo() {
 
   // Show loading state while auth is initializing
   if (authLoading) {
+    console.log('Demo: Showing auth loading state');
     return (
       <div className="min-h-screen bg-gray-900 flex items-center justify-center">
         <div className="flex items-center text-white">
@@ -364,6 +392,7 @@ export default function Demo() {
 
   // Show auth error if present
   if (authError) {
+    console.log('Demo: Showing auth error state:', authError);
     return (
       <div className="min-h-screen bg-gray-900 flex items-center justify-center">
         <div className="bg-red-500/10 border border-red-500/20 rounded-lg p-4 text-red-200 max-w-md">
@@ -382,6 +411,7 @@ export default function Demo() {
 
   // Show login prompt if not authenticated
   if (!user) {
+    console.log('Demo: Showing login prompt (no user)');
     return (
       <div className="min-h-screen bg-gray-900 flex items-center justify-center">
         <div className="text-white text-center">
@@ -398,6 +428,8 @@ export default function Demo() {
   }
 
   const isTokenLimitReached = totalTokensUsed >= 2000;
+
+  console.log('Demo: Rendering main demo interface for user:', user.email);
 
   return (
     <div className="min-h-screen bg-gray-900 pt-16">

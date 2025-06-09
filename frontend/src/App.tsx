@@ -1,6 +1,7 @@
 import React, { useEffect } from 'react';
 import { BrowserRouter as Router, Routes, Route, useNavigate, useLocation } from 'react-router-dom';
 import { AuthProvider } from './contexts/AuthProvider';
+import ErrorBoundary from './components/ErrorBoundary';
 import Navbar from './components/Navbar';
 import Home from './pages/Home';
 import Demo from './pages/Demo';
@@ -22,23 +23,27 @@ function AppContent() {
   return (
     <div className="min-h-screen">
       {showNavbar && <Navbar />}
-      <Routes>
-        <Route path="/" element={<Home />} />
-        <Route path="/demo" element={<Demo />} />
-        <Route path="/learn" element={<LearnMore />} />
-        <Route path="/auth" element={<Auth />} />
-      </Routes>
+      <ErrorBoundary>
+        <Routes>
+          <Route path="/" element={<Home />} />
+          <Route path="/demo" element={<Demo />} />
+          <Route path="/learn" element={<LearnMore />} />
+          <Route path="/auth" element={<Auth />} />
+        </Routes>
+      </ErrorBoundary>
     </div>
   );
 }
 
 function App() {
   return (
-    <AuthProvider>
-      <Router>
-        <AppContent />
-      </Router>
-    </AuthProvider>
+    <ErrorBoundary>
+      <AuthProvider>
+        <Router>
+          <AppContent />
+        </Router>
+      </AuthProvider>
+    </ErrorBoundary>
   );
 }
 
