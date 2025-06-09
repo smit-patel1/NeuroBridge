@@ -50,15 +50,18 @@ export function useAuth() {
         return false;
       }
 
-      // Check if token is about to expire (within 5 minutes)
       const expiresAt = session.expires_at;
-      const now = Math.floor(Date.now() / 1000);
-      const timeUntilExpiry = expiresAt - now;
-
-      if (timeUntilExpiry < 300) { // Less than 5 minutes
-        console.log('Token expiring soon, refreshing...');
-        return await refreshSession();
+      
+      if (expiresAt !== undefined) {
+        const now = Math.floor(Date.now() / 1000);
+        const timeUntilExpiry = expiresAt - now;
+      
+        if (timeUntilExpiry < 300) {
+          console.log('Token expiring soon, refreshing...');
+          return await refreshSession();
+        }
       }
+
 
       return true;
     } catch (error) {
