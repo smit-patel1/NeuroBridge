@@ -45,18 +45,18 @@ export default function Demo() {
       
       const { data, error } = await supabase
         .from('token_usage')
-        .select('sum(tokens_used)')
-        .eq('user_id', user.id)
-        .single();
+        .select('tokens_used')
+        .eq('user_id', user.id);
 
       if (error) {
         console.error('Demo: Token usage fetch error:', error);
         return;
       }
 
-      const tokens = data?.sum || 0;
-      setTotalTokensUsed(tokens);
-      console.log('Demo: Current token usage:', tokens);
+      // Calculate total tokens used by summing all records
+      const totalTokens = data?.reduce((sum, record) => sum + (record.tokens_used || 0), 0) || 0;
+      setTotalTokensUsed(totalTokens);
+      console.log('Demo: Current token usage:', totalTokens);
     } catch (error) {
       console.error('Demo: Token usage fetch failed:', error);
     } finally {
