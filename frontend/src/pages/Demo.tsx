@@ -1,7 +1,7 @@
 // Demo.tsx
 import React, { useState, useRef, useEffect } from 'react';
 import { Loader2, AlertCircle, ChevronDown, Code } from 'lucide-react';
-import { useAuth } from './hooks/useAuth';
+import { useAuth } from 'src/hooks/useAuth';
 
 const subjects = ['Mathematics', 'Physics', 'Computer Science'];
 
