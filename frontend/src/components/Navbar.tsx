@@ -9,40 +9,91 @@ export default function Navbar() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    // Get initial user using getUser() instead of getSession() to avoid stale cache
-    const getCurrentUser = async () => {
+    // Get initial auth state using session first, then validate with getUser
+    const getCurrentAuth = async () => {
       try {
-        console.log('🔄 Navbar: Fetching current user...');
-        const { data: { user }, error } = await supabase.auth.getUser();
+        console.log('🔄 Navbar: Checking initial auth state...');
         
-        if (error) {
-          console.error('❌ Navbar: Error getting current user:', error);
+        // First check if we have a session
+        const { data: { session }, error: sessionError } = await supabase.auth.getSession();
+        
+        if (sessionError) {
+          console.error('❌ Navbar: Session error:', sessionError);
           setUser(null);
-        } else {
-          setUser(user);
-          console.log('✓ Navbar: Current user loaded:', user ? `${user.email}` : 'No user');
+          setLoading(false);
+          return;
+        }
+
+        if (!session) {
+          console.log('✓ Navbar: No session found, user not authenticated');
+          setUser(null);
+          setLoading(false);
+          return;
+        }
+
+        // If we have a session, validate it with getUser
+        try {
+          const { data: { user }, error: userError } = await supabase.auth.getUser();
+          
+          if (userError) {
+            console.error('❌ Navbar: User validation failed:', userError);
+            // Session exists but user validation failed - likely expired
+            console.log('🔄 Navbar: Session appears expired, clearing auth state');
+            await supabase.auth.signOut();
+            setUser(null);
+          } else if (user) {
+            console.log('✓ Navbar: User authenticated and validated:', user.email);
+            setUser(user);
+          } else {
+            console.log('✓ Navbar: No user found despite session');
+            setUser(null);
+          }
+        } catch (authError) {
+          console.error('❌ Navbar: Auth validation error:', authError);
+          // If getUser fails with "Auth session missing", clear everything
+          if (authError.message?.includes('Auth session missing')) {
+            console.log('🔄 Navbar: Auth session missing, clearing state');
+            await supabase.auth.signOut();
+          }
+          setUser(null);
         }
       } catch (error) {
-        console.error('❌ Navbar: Unexpected error getting user:', error);
+        console.error('❌ Navbar: Unexpected error during auth check:', error);
         setUser(null);
       } finally {
         setLoading(false);
       }
     };
 
-    getCurrentUser();
+    getCurrentAuth();
 
     // Listen for auth changes
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
       console.log('✓ Navbar: Auth state changed:', event, session?.user ? `User: ${session.user.email}` : 'No user');
       
-      // Always update user state based on session
-      setUser(session?.user || null);
-      
-      // Handle sign out event specifically
-      if (event === 'SIGNED_OUT') {
-        console.log('✓ Navbar: User signed out event received, clearing state');
+      if (event === 'SIGNED_OUT' || !session) {
+        console.log('✓ Navbar: User signed out or session ended');
         setUser(null);
+      } else if (event === 'SIGNED_IN' && session?.user) {
+        console.log('✓ Navbar: User signed in:', session.user.email);
+        setUser(session.user);
+      } else if (event === 'TOKEN_REFRESHED' && session?.user) {
+        console.log('✓ Navbar: Token refreshed for user:', session.user.email);
+        setUser(session.user);
+      } else if (session?.user) {
+        // For other events, validate the user
+        try {
+          const { data: { user }, error } = await supabase.auth.getUser();
+          if (error) {
+            console.error('❌ Navbar: User validation failed during auth change:', error);
+            setUser(null);
+          } else {
+            setUser(user);
+          }
+        } catch (error) {
+          console.error('❌ Navbar: Error validating user during auth change:', error);
+          setUser(null);
+        }
       }
     });
 
@@ -68,9 +119,11 @@ export default function Navbar() {
         
         // Try to restore user state if sign out failed
         try {
-          const { data: { user: currentUser } } = await supabase.auth.getUser();
-          setUser(currentUser);
-          console.log('⚠️ Navbar: Restored user state after failed sign out');
+          const { data: { session } } = await supabase.auth.getSession();
+          if (session?.user) {
+            setUser(session.user);
+            console.log('⚠️ Navbar: Restored user state after failed sign out');
+          }
         } catch (restoreError) {
           console.error('❌ Navbar: Could not restore user state:', restoreError);
         }
@@ -88,9 +141,11 @@ export default function Navbar() {
       
       // Try to restore user state on unexpected error
       try {
-        const { data: { user: currentUser } } = await supabase.auth.getUser();
-        setUser(currentUser);
-        console.log('⚠️ Navbar: Restored user state after unexpected error');
+        const { data: { session } } = await supabase.auth.getSession();
+        if (session?.user) {
+          setUser(session.user);
+          console.log('⚠️ Navbar: Restored user state after unexpected error');
+        }
       } catch (restoreError) {
         console.error('❌ Navbar: Could not restore user state after error:', restoreError);
       }

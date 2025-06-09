@@ -43,28 +43,58 @@ export default function Demo() {
   const followUpRef = useRef<HTMLDivElement>(null);
   const iframeRef = useRef<HTMLIFrameElement>(null);
 
-  // Check authentication on component mount
+  // Check authentication on component mount with robust session handling
   useEffect(() => {
     const checkAuth = async () => {
       try {
-        const { data: { user }, error } = await supabase.auth.getUser();
-        if (error) {
-          console.error('Demo: Auth error:', error);
+        console.log('🔄 Demo: Checking authentication...');
+        
+        // First check if we have a session
+        const { data: { session }, error: sessionError } = await supabase.auth.getSession();
+        
+        if (sessionError) {
+          console.error('❌ Demo: Session error:', sessionError);
           navigate('/auth');
           return;
         }
-        
-        if (!user) {
-          console.log('Demo: No user found, redirecting to auth');
+
+        if (!session) {
+          console.log('❌ Demo: No session found, redirecting to auth');
           navigate('/auth');
           return;
         }
-        
-        console.log('✓ Demo: User authenticated:', user.email);
-        setUser(user);
-        setAuthLoading(false);
+
+        // Validate the session with getUser
+        try {
+          const { data: { user }, error: userError } = await supabase.auth.getUser();
+          
+          if (userError) {
+            console.error('❌ Demo: User validation failed:', userError);
+            console.log('🔄 Demo: Session appears expired, redirecting to auth');
+            navigate('/auth');
+            return;
+          }
+          
+          if (!user) {
+            console.log('❌ Demo: No user found despite session, redirecting to auth');
+            navigate('/auth');
+            return;
+          }
+          
+          console.log('✓ Demo: User authenticated and validated:', user.email);
+          setUser(user);
+          setAuthLoading(false);
+        } catch (authError) {
+          console.error('❌ Demo: Auth validation error:', authError);
+          if (authError.message?.includes('Auth session missing')) {
+            console.log('🔄 Demo: Auth session missing, clearing and redirecting');
+            await supabase.auth.signOut();
+          }
+          navigate('/auth');
+          return;
+        }
       } catch (error) {
-        console.error('Demo: Auth check error:', error);
+        console.error('❌ Demo: Auth check error:', error);
         navigate('/auth');
       }
     };
@@ -78,12 +108,23 @@ export default function Demo() {
       if (event === 'SIGNED_OUT' || !session) {
         console.log('✓ Demo: User signed out, redirecting to auth');
         navigate('/auth');
-      } else if (session) {
-        // Use getUser() to get the most current user data
-        const { data: { user }, error } = await supabase.auth.getUser();
-        if (user && !error) {
-          console.log('✓ Demo: User session updated:', user.email);
-          setUser(user);
+      } else if (event === 'TOKEN_REFRESHED' && session?.user) {
+        console.log('✓ Demo: Token refreshed, updating user:', session.user.email);
+        setUser(session.user);
+      } else if (session?.user) {
+        // For other events, validate the user to ensure session is still valid
+        try {
+          const { data: { user }, error } = await supabase.auth.getUser();
+          if (error) {
+            console.error('❌ Demo: User validation failed during auth change:', error);
+            navigate('/auth');
+          } else if (user) {
+            console.log('✓ Demo: User session updated and validated:', user.email);
+            setUser(user);
+          }
+        } catch (error) {
+          console.error('❌ Demo: Error validating user during auth change:', error);
+          navigate('/auth');
         }
       }
     });
@@ -136,7 +177,7 @@ export default function Demo() {
 
   const logTokenUsage = async (tokens: number, promptText: string) => {
     try {
-      // Get the most current user data
+      // Always get fresh user data before logging
       const { data: { user }, error: userError } = await supabase.auth.getUser();
       
       if (userError) {
@@ -272,40 +313,39 @@ export default function Demo() {
   }, [simulationData]);
 
   const runSimulation = async () => {
-    console.log('Demo: Starting simulation run...');
+    console.log('🔄 Demo: Starting simulation run...');
     
-    // Verify user authentication before proceeding
-    const { data: { user }, error: userError } = await supabase.auth.getUser();
-    
-    if (userError || !user?.id) {
-      console.error('Demo: Authentication required for simulation');
-      setError('Authentication required. Please log in to use the simulation.');
-      navigate('/auth');
-      return;
-    }
-
-    console.log('✓ Demo: User authenticated, checking token usage...');
-
-    // Refresh token usage before checking limit
-    await loadTokenUsage();
-
-    // Check token limit before making request
-    if (tokensUsed >= TOKEN_LIMIT) {
-      console.log('Demo: Token limit reached');
-      setError(`You've reached your free token limit (${TOKEN_LIMIT.toLocaleString()} tokens). Please contact support for more access.`);
-      return;
-    }
-
-    console.log(`✓ Demo: Token check passed (${tokensUsed}/${TOKEN_LIMIT}), running simulation...`);
-
-    // Reset all simulation state before starting
-    setLoading(true);
-    setError('');
-    setSuggestion('');
-    setRawResponse('');
-    // Note: We don't clear simulationData here to allow running same prompt multiple times
-
+    // Verify user authentication before proceeding with fresh auth check
     try {
+      const { data: { user }, error: userError } = await supabase.auth.getUser();
+      
+      if (userError || !user?.id) {
+        console.error('❌ Demo: Authentication required for simulation:', userError);
+        setError('Authentication required. Please log in to use the simulation.');
+        navigate('/auth');
+        return;
+      }
+
+      console.log('✓ Demo: User authenticated, checking token usage...');
+
+      // Refresh token usage before checking limit
+      await loadTokenUsage();
+
+      // Check token limit before making request
+      if (tokensUsed >= TOKEN_LIMIT) {
+        console.log('❌ Demo: Token limit reached');
+        setError(`You've reached your free token limit (${TOKEN_LIMIT.toLocaleString()} tokens). Please contact support for more access.`);
+        return;
+      }
+
+      console.log(`✓ Demo: Token check passed (${tokensUsed}/${TOKEN_LIMIT}), running simulation...`);
+
+      // Reset simulation state before starting (but keep simulationData to allow re-running)
+      setLoading(true);
+      setError('');
+      setSuggestion('');
+      setRawResponse('');
+
       console.log('🔄 Demo: Sending request to simulation API...');
       
       const response = await fetch("https://zurfhydnztcxlomdyqds.functions.supabase.co/simulate", {
@@ -339,7 +379,7 @@ export default function Demo() {
       }
 
       if (data.error) {
-        console.error('Demo: API returned error:', data.error);
+        console.error('❌ Demo: API returned error:', data.error);
         setError(data.error);
         // Refresh token usage even for errors
         await loadTokenUsage();
@@ -382,6 +422,7 @@ export default function Demo() {
       // Refresh token usage even after errors
       await loadTokenUsage();
     } finally {
+      // Always clear loading state to ensure button becomes responsive again
       setLoading(false);
       console.log('✓ Demo: Simulation request finished (loading state cleared)');
     }
@@ -392,32 +433,32 @@ export default function Demo() {
     
     console.log('🔄 Demo: Starting follow-up request...');
     
-    // Verify user authentication before proceeding
-    const { data: { user }, error: userError } = await supabase.auth.getUser();
-    
-    if (userError || !user?.id) {
-      console.error('❌ Demo: Authentication required for follow-up');
-      setError('Authentication required. Please log in to continue.');
-      navigate('/auth');
-      return;
-    }
-    
-    // Refresh token usage before checking limit
-    await loadTokenUsage();
-    
-    // Check token limit for follow-up requests
-    if (tokensUsed >= TOKEN_LIMIT) {
-      console.log('❌ Demo: Token limit reached for follow-up');
-      setError(`You've reached your free token limit (${TOKEN_LIMIT.toLocaleString()} tokens). Please contact support for more access.`);
-      return;
-    }
-
-    console.log('✓ Demo: Follow-up token check passed, processing request...');
-
-    setLoading(true);
-    setError('');
-
+    // Verify user authentication before proceeding with fresh auth check
     try {
+      const { data: { user }, error: userError } = await supabase.auth.getUser();
+      
+      if (userError || !user?.id) {
+        console.error('❌ Demo: Authentication required for follow-up:', userError);
+        setError('Authentication required. Please log in to continue.');
+        navigate('/auth');
+        return;
+      }
+      
+      // Refresh token usage before checking limit
+      await loadTokenUsage();
+      
+      // Check token limit for follow-up requests
+      if (tokensUsed >= TOKEN_LIMIT) {
+        console.log('❌ Demo: Token limit reached for follow-up');
+        setError(`You've reached your free token limit (${TOKEN_LIMIT.toLocaleString()} tokens). Please contact support for more access.`);
+        return;
+      }
+
+      console.log('✓ Demo: Follow-up token check passed, processing request...');
+
+      setLoading(true);
+      setError('');
+
       // Make follow-up request to the simulation API
       const response = await fetch("https://zurfhydnztcxlomdyqds.functions.supabase.co/simulate", {
         method: 'POST',
@@ -478,6 +519,7 @@ export default function Demo() {
       // Refresh token usage even after errors
       await loadTokenUsage();
     } finally {
+      // Always clear loading state to ensure button becomes responsive again
       setLoading(false);
       console.log('✓ Demo: Follow-up request finished (loading state cleared)');
     }
@@ -515,8 +557,15 @@ export default function Demo() {
 
   const handleSignOut = async () => {
     console.log('🔄 Demo: User signing out...');
-    await supabase.auth.signOut();
-    navigate('/');
+    try {
+      await supabase.auth.signOut();
+      console.log('✓ Demo: Sign out successful, redirecting...');
+      navigate('/');
+    } catch (error) {
+      console.error('❌ Demo: Sign out error:', error);
+      // Force redirect even if sign out fails
+      navigate('/');
+    }
   };
 
   const remainingTokens = TOKEN_LIMIT - tokensUsed;
