@@ -49,7 +49,7 @@ export default function Demo() {
       try {
         const { data: { user }, error } = await supabase.auth.getUser();
         if (error) {
-          console.error('❌ Demo: Auth error:', error);
+          console.error('Demo: Auth error:', error);
           navigate('/auth');
           return;
         }
@@ -113,7 +113,7 @@ export default function Demo() {
         .single();
 
       if (error) {
-        console.error('❌ Demo: Error loading token usage:', error);
+        console.error('Demo: Error loading token usage:', error);
         return;
       }
 
@@ -339,7 +339,7 @@ export default function Demo() {
       }
 
       if (data.error) {
-        console.error('❌ Demo: API returned error:', data.error);
+        console.error('Demo: API returned error:', data.error);
         setError(data.error);
         // Refresh token usage even for errors
         await loadTokenUsage();
