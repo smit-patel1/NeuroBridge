@@ -12,20 +12,20 @@ export default function Navbar() {
     // Get initial auth state using session first, then validate with getUser
     const getCurrentAuth = async () => {
       try {
-        console.log('🔄 Navbar: Checking initial auth state...');
+        console.log('Navbar: Checking initial auth state...');
         
         // First check if we have a session
         const { data: { session }, error: sessionError } = await supabase.auth.getSession();
         
         if (sessionError) {
-          console.error('❌ Navbar: Session error:', sessionError);
+          console.error('Navbar: Session error:', sessionError);
           setUser(null);
           setLoading(false);
           return;
         }
 
         if (!session) {
-          console.log('✓ Navbar: No session found, user not authenticated');
+          console.log('Navbar: No session found, user not authenticated');
           setUser(null);
           setLoading(false);
           return;
@@ -36,29 +36,29 @@ export default function Navbar() {
           const { data: { user }, error: userError } = await supabase.auth.getUser();
           
           if (userError) {
-            console.error('❌ Navbar: User validation failed:', userError);
+            console.error('Navbar: User validation failed:', userError);
             // Session exists but user validation failed - likely expired
-            console.log('🔄 Navbar: Session appears expired, clearing auth state');
+            console.log('Navbar: Session appears expired, clearing auth state');
             await supabase.auth.signOut();
             setUser(null);
           } else if (user) {
-            console.log('✓ Navbar: User authenticated and validated:', user.email);
+            console.log('Navbar: User authenticated and validated:', user.email);
             setUser(user);
           } else {
-            console.log('✓ Navbar: No user found despite session');
+            console.log('Navbar: No user found despite session');
             setUser(null);
           }
-        } catch (authError) {
-          console.error('❌ Navbar: Auth validation error:', authError);
+        } catch (authError: any) {
+          console.error('Navbar: Auth validation error:', authError);
           // If getUser fails with "Auth session missing", clear everything
           if (authError.message?.includes('Auth session missing')) {
-            console.log('🔄 Navbar: Auth session missing, clearing state');
+            console.log('Navbar: Auth session missing, clearing state');
             await supabase.auth.signOut();
           }
           setUser(null);
         }
       } catch (error) {
-        console.error('❌ Navbar: Unexpected error during auth check:', error);
+        console.error('Navbar: Unexpected error during auth check:', error);
         setUser(null);
       } finally {
         setLoading(false);
@@ -69,44 +69,54 @@ export default function Navbar() {
 
     // Listen for auth changes
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
-      console.log('✓ Navbar: Auth state changed:', event, session?.user ? `User: ${session.user.email}` : 'No user');
+      console.log('Navbar: Auth state changed:', event, session?.user ? `User: ${session.user.email}` : 'No user');
       
       if (event === 'SIGNED_OUT' || !session) {
-        console.log('✓ Navbar: User signed out or session ended');
+        console.log('Navbar: User signed out or session ended');
         setUser(null);
       } else if (event === 'SIGNED_IN' && session?.user) {
-        console.log('✓ Navbar: User signed in:', session.user.email);
+        console.log('Navbar: User signed in:', session.user.email);
         setUser(session.user);
       } else if (event === 'TOKEN_REFRESHED' && session?.user) {
-        console.log('✓ Navbar: Token refreshed for user:', session.user.email);
+        console.log('Navbar: Token refreshed for user:', session.user.email);
         setUser(session.user);
       } else if (session?.user) {
-        // For other events, validate the user
+        // For other events, validate the user to ensure session is still valid
         try {
           const { data: { user }, error } = await supabase.auth.getUser();
           if (error) {
-            console.error('❌ Navbar: User validation failed during auth change:', error);
+            console.error('Navbar: User validation failed during auth change:', error);
+            // Handle session expiration gracefully
+            if (error.message?.includes('Auth session missing')) {
+              console.log('Navbar: Session expired during auth change, signing out');
+              await supabase.auth.signOut();
+            }
             setUser(null);
           } else {
+            console.log('Navbar: User validated during auth change:', user?.email);
             setUser(user);
           }
-        } catch (error) {
-          console.error('❌ Navbar: Error validating user during auth change:', error);
+        } catch (error: any) {
+          console.error('Navbar: Error validating user during auth change:', error);
+          if (error.message?.includes('Auth session missing')) {
+            console.log('Navbar: Session missing during validation, signing out');
+            await supabase.auth.signOut();
+          }
           setUser(null);
         }
       }
     });
 
     return () => {
-      console.log('✓ Navbar: Cleaning up auth subscription');
+      console.log('Navbar: Cleaning up auth subscription');
       subscription.unsubscribe();
     };
   }, []);
 
   const handleSignOut = async () => {
     try {
-      console.log('🔄 Navbar: Starting sign out process...');
-      console.log('🔄 Navbar: Current user before sign out:', user?.email || 'No user');
+      console.log('Navbar: Starting sign out process...');
+      console.log('Navbar: Current user before sign out:', user?.email || 'No user');
       
       // Clear user state immediately for responsive UI
       setUser(null);
@@ -115,49 +125,49 @@ export default function Navbar() {
       const { error } = await supabase.auth.signOut();
       
       if (error) {
-        console.error('❌ Navbar: Sign out failed:', error.message);
+        console.error('Navbar: Sign out failed:', error.message);
         
         // Try to restore user state if sign out failed
         try {
           const { data: { session } } = await supabase.auth.getSession();
           if (session?.user) {
             setUser(session.user);
-            console.log('⚠️ Navbar: Restored user state after failed sign out');
+            console.log('Navbar: Restored user state after failed sign out');
           }
         } catch (restoreError) {
-          console.error('❌ Navbar: Could not restore user state:', restoreError);
+          console.error('Navbar: Could not restore user state:', restoreError);
         }
         return;
       }
       
-      console.log('✓ Navbar: Supabase sign out successful');
+      console.log('Navbar: Supabase sign out successful');
       
       // Use window.location.href for full page reload and complete session clearance
-      console.log('🔄 Navbar: Performing full page reload to clear session...');
+      console.log('Navbar: Performing full page reload to clear session...');
       window.location.href = '/';
       
-    } catch (error) {
-      console.error('❌ Navbar: Unexpected error during sign out:', error);
+    } catch (error: any) {
+      console.error('Navbar: Unexpected error during sign out:', error);
       
       // Try to restore user state on unexpected error
       try {
         const { data: { session } } = await supabase.auth.getSession();
         if (session?.user) {
           setUser(session.user);
-          console.log('⚠️ Navbar: Restored user state after unexpected error');
+          console.log('Navbar: Restored user state after unexpected error');
         }
       } catch (restoreError) {
-        console.error('❌ Navbar: Could not restore user state after error:', restoreError);
+        console.error('Navbar: Could not restore user state after error:', restoreError);
       }
     }
   };
 
   const handleDemoClick = () => {
     if (user) {
-      console.log('✓ Navbar: Navigating to demo (user authenticated):', user.email);
+      console.log('Navbar: Navigating to demo (user authenticated):', user.email);
       navigate('/demo');
     } else {
-      console.log('✓ Navbar: Redirecting to auth (user not authenticated)');
+      console.log('Navbar: Redirecting to auth (user not authenticated)');
       navigate('/auth');
     }
   };
