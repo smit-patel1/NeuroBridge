@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '../contexts/AuthProvider';
 import { supabase } from '../lib/supabaseClient';
-import { Play, Eye, EyeOff, LogOut, RefreshCw, Plus } from 'lucide-react';
+import { Play, Eye, EyeOff, LogOut, RefreshCw, Plus, Menu, X } from 'lucide-react';
 
 interface SimulationData {
   url: string;
@@ -23,37 +23,65 @@ export default function Demo(): JSX.Element {
   const [error, setError] = useState<string | null>(null);
   const [showConsole, setShowConsole] = useState<boolean>(false);
   const [tokenUsage, setTokenUsage] = useState<number>(0);
-  const [suggestions, setSuggestions] = useState<string[]>([]);
+  const [sidebarOpen, setSidebarOpen] = useState<boolean>(false);
+  const [followUpQuestions, setFollowUpQuestions] = useState<string[]>([]);
 
   // Debug logging
   console.log('Demo render state:', { user, authLoading, authError });
 
   useEffect(() => {
-    // Set some example suggestions based on subject
-    const subjectSuggestions: Record<string, string[]> = {
+    // Generate follow-up questions based on the simulation
+    if (simulationData && prompt) {
+      const questions = generateFollowUpQuestions(prompt, subject);
+      setFollowUpQuestions(questions);
+    } else {
+      setFollowUpQuestions([]);
+    }
+  }, [simulationData, prompt, subject]);
+
+  // Generate context-aware follow-up questions
+  const generateFollowUpQuestions = (currentPrompt: string, currentSubject: string): string[] => {
+    const baseQuestions = [
+      "Can you explain the result in simpler terms?",
+      "What are the real-world applications of this simulation?",
+      "How does this compare to a different method?",
+      "What would happen if I change this variable?"
+    ];
+
+    const subjectSpecificQuestions: Record<string, string[]> = {
       Mathematics: [
-        "Visualize the Pythagorean theorem",
-        "Show how derivatives work",
-        "Demonstrate matrix multiplication"
+        "Can you show this with different values?",
+        "What's the mathematical proof behind this?",
+        "How does this relate to other mathematical concepts?",
+        "Can you visualize the inverse operation?"
       ],
       Physics: [
-        "Simulate projectile motion",
-        "Show electromagnetic waves",
-        "Demonstrate pendulum motion"
+        "What forces are acting in this simulation?",
+        "How would this change in a different environment?",
+        "Can you show the energy transformations?",
+        "What happens at different scales?"
       ],
       Chemistry: [
-        "Visualize molecular bonding",
-        "Show chemical reactions",
-        "Demonstrate pH changes"
+        "What are the molecular interactions here?",
+        "How does temperature affect this reaction?",
+        "Can you show the electron movement?",
+        "What are the byproducts of this process?"
       ],
       Biology: [
-        "Show cell division",
-        "Demonstrate DNA replication",
-        "Visualize photosynthesis"
+        "How does this process vary in different organisms?",
+        "What happens when this process goes wrong?",
+        "Can you show the cellular mechanisms?",
+        "How does this relate to evolution?"
       ]
     };
-    setSuggestions(subjectSuggestions[subject] || []);
-  }, [subject]);
+
+    // Combine base questions with subject-specific ones
+    const allQuestions = [...baseQuestions, ...(subjectSpecificQuestions[currentSubject] || [])];
+    
+    // Return 3-4 random questions
+    const shuffled = allQuestions.sort(() => 0.5 - Math.random());
+    return shuffled.slice(0, Math.floor(Math.random() * 2) + 3); // 3-4 questions
+  };
 
   // Show loading state
   if (authLoading) {
@@ -136,28 +164,42 @@ export default function Demo(): JSX.Element {
     setSimulationData(null);
     setPrompt('');
     setError(null);
+    setFollowUpQuestions([]);
   };
 
-  const handleFollowUp = (): void => {
-    // Logic for follow-up questions
-    console.log('Follow up simulation');
+  const handleFollowUpQuestion = (question: string): void => {
+    // Set the follow-up question as the new prompt and run simulation
+    setPrompt(question);
+    // Auto-run the simulation with the follow-up question
+    setTimeout(() => {
+      handleRunSimulation();
+    }, 100);
   };
 
-  const handleSuggestionClick = (suggestion: string): void => {
-    setPrompt(suggestion);
+  const toggleSidebar = (): void => {
+    setSidebarOpen(!sidebarOpen);
   };
 
   return (
     <div className="min-h-screen bg-gray-900 text-white overflow-hidden">
-      {/* Header */}
+      {/* Custom Demo Navbar */}
       <div className="border-b border-gray-700 bg-gray-800/50 backdrop-blur-sm">
         <div className="flex justify-between items-center px-6 py-4">
-          <div className="flex items-center space-x-4">
-            <h1 className="text-2xl font-bold text-white">MindRender Demo</h1>
-            <div className="hidden sm:block w-px h-6 bg-gray-600"></div>
-            <div className="hidden sm:block text-sm text-gray-400">
-              Interactive Learning Simulations
-            </div>
+          <div className="flex items-center space-x-6">
+            <h1 className="text-2xl font-bold text-white">MindRender</h1>
+            <button
+              onClick={toggleSidebar}
+              className="text-gray-300 hover:text-white transition-colors p-2 rounded-lg hover:bg-gray-700"
+            >
+              <Menu className="w-5 h-5" />
+            </button>
+            <button
+              onClick={handleNewSimulation}
+              className="bg-blue-500 text-white px-4 py-2 rounded-lg hover:bg-blue-400 transition-colors flex items-center space-x-2 ml-auto"
+            >
+              <Plus className="w-4 h-4" />
+              <span>New Simulation</span>
+            </button>
           </div>
           
           <div className="flex items-center space-x-4">
@@ -181,10 +223,90 @@ export default function Demo(): JSX.Element {
         </div>
       </div>
 
+      {/* Sidebar */}
+      <div className={`fixed inset-y-0 left-0 z-50 w-80 bg-gray-800 border-r border-gray-700 transform transition-transform duration-300 ${sidebarOpen ? 'translate-x-0' : '-translate-x-full'}`}>
+        <div className="flex flex-col h-full">
+          {/* Sidebar Header */}
+          <div className="flex justify-between items-center p-4 border-b border-gray-700">
+            <h2 className="text-lg font-semibold text-white">Menu</h2>
+            <button
+              onClick={toggleSidebar}
+              className="text-gray-400 hover:text-white transition-colors p-1 rounded"
+            >
+              <X className="w-5 h-5" />
+            </button>
+          </div>
+
+          {/* Sidebar Content */}
+          <div className="flex-1 overflow-y-auto p-4 space-y-6">
+            {/* Token Usage Section */}
+            <div className="bg-gray-700/50 rounded-lg p-4">
+              <h3 className="text-sm font-medium text-gray-300 mb-3">Token Usage</h3>
+              <div className="space-y-2">
+                <div className="flex justify-between text-sm">
+                  <span className="text-gray-400">Used:</span>
+                  <span className="text-white">{tokenUsage}</span>
+                </div>
+                <div className="flex justify-between text-sm">
+                  <span className="text-gray-400">Remaining:</span>
+                  <span className="text-white">{2000 - tokenUsage}</span>
+                </div>
+                <div className="w-full bg-gray-600 rounded-full h-2 mt-3">
+                  <div 
+                    className="bg-yellow-500 h-2 rounded-full transition-all duration-300" 
+                    style={{ width: `${(tokenUsage / 2000) * 100}%` }}
+                  ></div>
+                </div>
+                <div className="text-xs text-gray-400 text-center">
+                  {((tokenUsage / 2000) * 100).toFixed(1)}% of 2,000 tokens
+                </div>
+              </div>
+            </div>
+
+            {/* Previous Chats Section */}
+            <div>
+              <h3 className="text-sm font-medium text-gray-300 mb-3">Previous Chats</h3>
+              <div className="space-y-2">
+                {[1, 2, 3, 4, 5].map((chatId) => (
+                  <button
+                    key={chatId}
+                    className="w-full text-left bg-gray-700/30 hover:bg-gray-700/50 rounded-lg p-3 transition-colors"
+                  >
+                    <div className="text-sm text-white">Chat {chatId}</div>
+                    <div className="text-xs text-gray-400 truncate">
+                      {chatId === 1 && "Visualize binary search algorithm..."}
+                      {chatId === 2 && "Show how mitosis works..."}
+                      {chatId === 3 && "Simulate predator-prey dynamics..."}
+                      {chatId === 4 && "Demonstrate wave interference..."}
+                      {chatId === 5 && "Explain photosynthesis process..."}
+                    </div>
+                  </button>
+                ))}
+              </div>
+            </div>
+          </div>
+
+          {/* Settings Button */}
+          <div className="p-4 border-t border-gray-700">
+            <button className="w-full bg-gray-700 hover:bg-gray-600 text-white py-3 rounded-lg transition-colors">
+              Settings
+            </button>
+          </div>
+        </div>
+      </div>
+
+      {/* Sidebar Backdrop */}
+      {sidebarOpen && (
+        <div 
+          className="fixed inset-0 bg-black bg-opacity-50 z-40 lg:hidden"
+          onClick={toggleSidebar}
+        ></div>
+      )}
+
       {/* Main Content */}
       <div className="flex h-[calc(100vh-73px)]">
         {/* Left Sidebar */}
-        <div className="w-full md:w-80 lg:w-96 bg-gray-800 border-r border-gray-700 flex flex-col">
+        <div className="w-full md:w-80 lg:w-96 bg-gray-800 border-r border-gray-700 flex flex-col rounded-tl-xl">
           <div className="p-6 space-y-6 flex-1 overflow-y-auto">
             {/* Subject Selection */}
             <div>
@@ -219,20 +341,20 @@ export default function Demo(): JSX.Element {
               </div>
             </div>
 
-            {/* Suggestions */}
-            {suggestions.length > 0 && !prompt && (
+            {/* Follow Up Questions Section - Only show after simulation */}
+            {simulationData && followUpQuestions.length > 0 && (
               <div>
                 <label className="block text-sm font-medium text-gray-300 mb-3">
-                  Try these examples:
+                  Follow Up Questions
                 </label>
                 <div className="space-y-2">
-                  {suggestions.map((suggestion, index) => (
+                  {followUpQuestions.map((question, index) => (
                     <button
                       key={index}
-                      onClick={() => handleSuggestionClick(suggestion)}
-                      className="w-full text-left bg-gray-700/50 hover:bg-gray-700 border border-gray-600 rounded-lg px-3 py-2 text-sm text-gray-300 hover:text-white transition-colors"
+                      onClick={() => handleFollowUpQuestion(question)}
+                      className="w-full text-left bg-blue-500/10 hover:bg-blue-500/20 border border-blue-500/30 hover:border-blue-500/50 rounded-lg px-3 py-3 text-sm text-blue-200 hover:text-blue-100 transition-all duration-200"
                     >
-                      {suggestion}
+                      {question}
                     </button>
                   ))}
                 </div>
@@ -262,10 +384,10 @@ export default function Demo(): JSX.Element {
             {simulationData && (
               <div className="grid grid-cols-2 gap-3">
                 <button
-                  onClick={handleFollowUp}
+                  onClick={() => handleFollowUpQuestion("Can you explain this in more detail?")}
                   className="bg-blue-500 text-white py-2 px-4 rounded-lg hover:bg-blue-400 transition-colors text-sm"
                 >
-                  Follow Up
+                  Explain More
                 </button>
                 <button
                   onClick={handleNewSimulation}
@@ -293,7 +415,7 @@ export default function Demo(): JSX.Element {
         </div>
 
         {/* Main Simulation Area */}
-        <div className="flex-1 bg-white relative overflow-hidden">
+        <div className="flex-1 bg-white relative overflow-hidden rounded-tr-xl">
           {simulationData ? (
             <div className="h-full">
               <iframe
@@ -350,6 +472,7 @@ export default function Demo(): JSX.Element {
               <div className="ml-2 text-gray-400">Loading: {loading.toString()}</div>
               <div className="ml-2 text-gray-400">Token Usage: {tokenUsage}</div>
               <div className="ml-2 text-gray-400">Has Simulation: {!!simulationData}</div>
+              <div className="ml-2 text-gray-400">Follow-ups: {followUpQuestions.length}</div>
             </div>
             {error && (
               <div className="text-gray-300">
