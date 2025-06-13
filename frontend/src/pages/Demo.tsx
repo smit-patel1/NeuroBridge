@@ -1,12 +1,11 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useAuth } from '../contexts/AuthProvider';
 import { supabase } from '../lib/supabaseClient';
 import { Play, Eye, EyeOff, LogOut, RefreshCw, Plus, Menu, X } from 'lucide-react';
 
-interface SimulationData {
-  url: string;
-  id: string;
-  title?: string;
+interface SimulationResponse {
+  canvasHtml: string;
+  jsCode: string;
 }
 
 interface User {
@@ -19,12 +18,13 @@ export default function Demo(): JSX.Element {
   const [subject, setSubject] = useState<string>('Mathematics');
   const [prompt, setPrompt] = useState<string>('');
   const [loading, setLoading] = useState<boolean>(false);
-  const [simulationData, setSimulationData] = useState<SimulationData | null>(null);
+  const [simulationData, setSimulationData] = useState<SimulationResponse | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [showConsole, setShowConsole] = useState<boolean>(false);
   const [tokenUsage, setTokenUsage] = useState<number>(0);
   const [sidebarOpen, setSidebarOpen] = useState<boolean>(false);
   const [followUpQuestions, setFollowUpQuestions] = useState<string[]>([]);
+  const iframeRef = useRef<HTMLIFrameElement>(null);
 
   // Debug logging
   console.log('Demo render state:', { user, authLoading, authError });
@@ -141,12 +141,91 @@ export default function Demo(): JSX.Element {
     setError(null);
     
     try {
-      // Simulate API call
-      const result = await runSimulation(prompt, subject);
-      setSimulationData(result);
+      console.log('Sending request to Supabase Edge Function...');
+      
+      // Get the current session for authentication
+      const { data: { session } } = await supabase.auth.getSession();
+      
+      if (!session) {
+        throw new Error('No valid session found. Please log in again.');
+      }
+
+      // Make request to Supabase Edge Function
+      const response = await fetch(
+        'https://zurfhydnztcxlomdyqds.supabase.co/functions/v1/simulate',
+        {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${session.access_token}`,
+          },
+          body: JSON.stringify({
+            prompt: prompt.trim(),
+            subject: subject
+          }),
+        }
+      );
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        throw new Error(`Simulation failed: ${response.status} ${response.statusText}. ${errorText}`);
+      }
+
+      const data: SimulationResponse = await response.json();
+      
+      if (!data.canvasHtml || !data.jsCode) {
+        throw new Error('Invalid response format from simulation service');
+      }
+
+      console.log('Simulation generated successfully');
+      setSimulationData(data);
+      
+      // Inject the simulation into the iframe
+      if (iframeRef.current) {
+        const combinedContent = `
+          <!DOCTYPE html>
+          <html lang="en">
+          <head>
+            <meta charset="UTF-8">
+            <meta name="viewport" content="width=device-width, initial-scale=1.0">
+            <title>MindRender Simulation</title>
+            <style>
+              body {
+                margin: 0;
+                padding: 20px;
+                font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+                background: #f8fafc;
+              }
+              canvas {
+                border: 1px solid #e2e8f0;
+                border-radius: 8px;
+                box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+              }
+            </style>
+          </head>
+          <body>
+            ${data.canvasHtml}
+            <script>
+              ${data.jsCode}
+            </script>
+          </body>
+          </html>
+        `;
+        
+        const blob = new Blob([combinedContent], { type: 'text/html' });
+        const url = URL.createObjectURL(blob);
+        iframeRef.current.src = url;
+        
+        // Clean up the blob URL after iframe loads
+        iframeRef.current.onload = () => {
+          URL.revokeObjectURL(url);
+        };
+      }
+      
       setTokenUsage(prev => prev + 1);
     } catch (err: any) {
-      setError(err.message || 'An error occurred');
+      console.error('Simulation error:', err);
+      setError(err.message || 'An error occurred while generating the simulation');
     } finally {
       setLoading(false);
     }
@@ -165,6 +244,11 @@ export default function Demo(): JSX.Element {
     setPrompt('');
     setError(null);
     setFollowUpQuestions([]);
+    
+    // Clear the iframe
+    if (iframeRef.current) {
+      iframeRef.current.src = 'about:blank';
+    }
   };
 
   const handleFollowUpQuestion = (question: string): void => {
@@ -352,7 +436,8 @@ export default function Demo(): JSX.Element {
                     <button
                       key={index}
                       onClick={() => handleFollowUpQuestion(question)}
-                      className="w-full text-left bg-blue-500/10 hover:bg-blue-500/20 border border-blue-500/30 hover:border-blue-500/50 rounded-lg px-3 py-3 text-sm text-blue-200 hover:text-blue-100 transition-all duration-200"
+                      disabled={loading}
+                      className="w-full text-left bg-blue-500/10 hover:bg-blue-500/20 border border-blue-500/30 hover:border-blue-500/50 rounded-lg px-3 py-3 text-sm text-blue-200 hover:text-blue-100 transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed"
                     >
                       {question}
                     </button>
@@ -385,7 +470,8 @@ export default function Demo(): JSX.Element {
               <div className="grid grid-cols-2 gap-3">
                 <button
                   onClick={() => handleFollowUpQuestion("Can you explain this in more detail?")}
-                  className="bg-blue-500 text-white py-2 px-4 rounded-lg hover:bg-blue-400 transition-colors text-sm"
+                  disabled={loading}
+                  className="bg-blue-500 text-white py-2 px-4 rounded-lg hover:bg-blue-400 transition-colors text-sm disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   Explain More
                 </button>
@@ -407,6 +493,12 @@ export default function Demo(): JSX.Element {
                   <div>
                     <div className="text-red-400 font-medium text-sm">Simulation Error</div>
                     <div className="text-red-300 text-sm mt-1">{error}</div>
+                    <button
+                      onClick={() => setError(null)}
+                      className="text-red-400 hover:text-red-300 text-xs mt-2 underline"
+                    >
+                      Dismiss
+                    </button>
                   </div>
                 </div>
               </div>
@@ -419,7 +511,8 @@ export default function Demo(): JSX.Element {
           {simulationData ? (
             <div className="h-full">
               <iframe
-                src={simulationData.url}
+                ref={iframeRef}
+                id="simulation-iframe"
                 className="w-full h-full border-0"
                 title="Interactive Simulation"
                 sandbox="allow-scripts allow-same-origin"
@@ -485,78 +578,4 @@ export default function Demo(): JSX.Element {
       )}
     </div>
   );
-}
-
-// Placeholder simulation function with proper typing
-async function runSimulation(prompt: string, subject: string): Promise<SimulationData> {
-  return new Promise((resolve, reject) => {
-    setTimeout(() => {
-      if (Math.random() > 0.1) { // 90% success rate
-        resolve({
-          id: Math.random().toString(36).substr(2, 9),
-          url: `data:text/html;charset=utf-8,${encodeURIComponent(`
-            <html>
-              <head>
-                <title>Simulation: ${subject}</title>
-                <style>
-                  body { 
-                    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-                    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-                    color: white;
-                    margin: 0;
-                    padding: 40px;
-                    min-height: 100vh;
-                    display: flex;
-                    flex-direction: column;
-                    align-items: center;
-                    justify-content: center;
-                  }
-                  .container {
-                    background: rgba(255, 255, 255, 0.1);
-                    backdrop-filter: blur(10px);
-                    border-radius: 20px;
-                    padding: 40px;
-                    text-align: center;
-                    max-width: 600px;
-                    border: 1px solid rgba(255, 255, 255, 0.2);
-                  }
-                  h1 { color: #ffd700; margin-bottom: 20px; }
-                  .simulation-box {
-                    background: rgba(255, 255, 255, 0.05);
-                    border-radius: 15px;
-                    padding: 30px;
-                    margin: 20px 0;
-                    border: 2px dashed rgba(255, 255, 255, 0.3);
-                  }
-                  .pulse {
-                    animation: pulse 2s infinite;
-                  }
-                  @keyframes pulse {
-                    0% { opacity: 1; }
-                    50% { opacity: 0.5; }
-                    100% { opacity: 1; }
-                  }
-                </style>
-              </head>
-              <body>
-                <div class="container">
-                  <h1>🧠 MindRender Simulation</h1>
-                  <h2>Subject: ${subject}</h2>
-                  <div class="simulation-box pulse">
-                    <h3>📊 Interactive Visualization</h3>
-                    <p><strong>Prompt:</strong> "${prompt}"</p>
-                    <p>✨ This simulation would visualize your concept interactively!</p>
-                    <p>🎯 Features: 3D graphics, interactive controls, real-time feedback</p>
-                  </div>
-                  <p><em>Demo simulation - Full version would include interactive 3D visualizations, animations, and user controls.</em></p>
-                </div>
-              </body>
-            </html>
-          `)}`
-        });
-      } else {
-        reject(new Error('Simulation generation failed. Please try again.'));
-      }
-    }, 2000 + Math.random() * 2000); // 2-4 second delay
-  });
 }
